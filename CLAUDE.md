@@ -18,16 +18,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - UI 텍스트는 반드시 vue-i18n 리소스 파일을 통해 다국어 처리한다. 하드코딩 금지.
 - 코드에 한글 주석을 상세하게 작성한다. (함수 목적/파라미터, SQL 쿼리 의도, 복잡한 로직, Vue 컴포넌트 역할)
 
+## 디렉토리 구조
+
+```
+tpk_mvp/
+├── api/              # FastAPI 백엔드 API 서버
+├── user-web/         # 사용자 웹 (Vue.js)
+├── admin-web/        # 관리자 웹 (Vue.js)
+└── db_specs/         # DB 접속정보 및 테이블 명세서
+```
+
+> 각 폴더별 상세 지침은 해당 폴더의 CLAUDE.md 참조
+
 ## 개발 환경 명령어 (Windows Git Bash)
 
 ```bash
-# Backend
-cd backend
+# API 서버
+cd api
 source venv/Scripts/activate
 uvicorn app.main:app --reload
 
-# Frontend
-cd frontend
+# 사용자 웹
+cd user-web
+npm install
+npm run dev
+
+# 관리자 웹
+cd admin-web
 npm install
 npm run dev
 ```
@@ -36,12 +53,20 @@ npm run dev
 
 - 개발 DB서버 접속정보: `/db_specs/.env`
 - 테이블 명세서: `/db_specs/<project_name>_table_spec_<yyyymmdd>.xlsx`
-- Backend 앱 환경변수 (`DATABASE_URL`, `JWT_SECRET_KEY` 등)는 Backend `.env` 파일에 설정
+- API 서버 환경변수 (`DATABASE_URL`, `JWT_SECRET_KEY` 등)는 `api/.env` 파일에 설정
 
-## 디렉토리 구조
+## 핵심기능
 
-> 추후 확정 예정
-
-## API 엔드포인트 설계
-
-> 추후 기능 확정 후 작성 예정
+- 관리자 WEB (`admin-web/`)
+  - 사용자 관리
+  - 사용자 학습 이력
+  - 문항구조 관리
+  - 문항유형 관리
+  - 시험문항 관리
+  - 연습문항 관리
+  - 그룹코드 관리
+  - 코드 관리
+- 사용자 WEB (`user-web/`)
+  - 학습 대시보드
+  - 시험문제(기출 및 모의)
+  - 연습문제
