@@ -51,9 +51,13 @@ npm run dev
 
 ## 환경변수
 
-- 개발 DB서버 접속정보: `/db_specs/.env`
-- 테이블 명세서: `/db_specs/<project_name>_table_spec_<yyyymmdd>.xlsx`
-- API 서버 환경변수 (`DATABASE_URL`, `JWT_SECRET_KEY` 등)는 `api/.env` 파일에 설정
+- API 서버 환경변수 (DB 접속정보, `JWT_SECRET_KEY` 등): `api/.env`
+- 테이블 명세서: `db_specs/tpk_table_spec_<yyyymmdd>.xlsx`
+
+## DB 스크립트
+
+- 테이블 생성: `db_specs/create_tables.py`
+- 테이블/컬럼 코멘트 적용: `db_specs/add_comments.py`
 
 ## 핵심기능
 

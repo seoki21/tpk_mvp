@@ -39,6 +39,7 @@ uvicorn app.main:app --reload
 ## 코딩 규칙
 
 ### SQL 작성
+
 - **파라미터 바인딩 필수**: `%s` 플레이스홀더 + 튜플 파라미터 사용. f-string이나 문자열 포맷으로 SQL에 값을 삽입하지 않는다.
 - 쿼리가 길 경우 여러 줄 문자열(`"""`)로 작성하고, 각 절(SELECT, FROM, WHERE 등)을 줄바꿈한다.
 - SQL 쿼리 위에 한글 주석으로 쿼리의 목적을 설명한다.
@@ -58,23 +59,26 @@ cursor.execute(
 ```
 
 ### API 응답 형식
+
 - 성공 응답: `{ "data": ..., "message": "..." }`
 - 목록 응답: `{ "data": [...], "total": 100, "page": 1, "size": 20 }`
 - 에러 응답: `{ "detail": "에러 메시지" }` (FastAPI HTTPException 사용)
 
 ### 라우터 구성
+
 - 도메인별로 라우터 파일 분리 (예: `routers/users.py`, `routers/exams.py`)
 - URL 접두사: `/api/v1/{도메인}`
 - 라우터 함수에 한글 docstring 작성
 
 ### 에러 처리
+
 - DB 에러는 try/except로 잡아서 적절한 HTTP 상태 코드로 변환
 - 400: 잘못된 요청 / 401: 인증 실패 / 403: 권한 없음 / 404: 리소스 없음 / 500: 서버 내부 오류
 
 ## 환경변수
 
-| 변수명 | 설명 | 예시 |
-|--------|------|------|
-| `DATABASE_URL` | PostgreSQL 접속 문자열 | `postgresql://user:pass@host:5432/dbname` |
-| `JWT_SECRET_KEY` | JWT 서명 비밀키 | (임의 문자열) |
-| `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분) | `60` |
+| 변수명                 | 설명                   | 예시                                        |
+| ---------------------- | ---------------------- | ------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL 접속 문자열 | `postgresql://user:pass@host:5432/dbname` |
+| `JWT_SECRET_KEY`     | JWT 서명 비밀키        | (임의 문자열)                               |
+| `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분)      | `60`                                      |
