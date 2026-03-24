@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 핵심 제약사항
 
-- DB 접근은 ORM을 사용하지 않는다. psycopg2로 SQL을 직접 작성한다.
+- DB 접근은 ORM을 사용하지 않는다. psycopg(v3)로 SQL을 직접 작성한다.
 - 시험 문제 본문/선택지는 다국어 번역하지 않는다 (한국어 원문 유지).
 - UI 텍스트는 반드시 vue-i18n 리소스 파일을 통해 다국어 처리한다. 하드코딩 금지.
 - 코드에 한글 주석을 상세하게 작성한다. (함수 목적/파라미터, SQL 쿼리 의도, 복잡한 로직, Vue 컴포넌트 역할)
@@ -63,7 +63,6 @@ npm run dev
 
 - 관리자 WEB (`admin-web/`)
   - 사용자 관리
-  - 사용자 학습 이력
   - 문항구조 관리
   - 문항유형 관리
   - 시험문항 관리

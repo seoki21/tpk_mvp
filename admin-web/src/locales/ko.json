@@ -1,2 +1,61 @@
 {
+  "app": {
+    "title": "TPK Pilot UI"
+  },
+  "menu": {
+    "userManagement": "사용자 관리",
+    "examQuestion": "시험문항 관리",
+    "practiceQuestion": "연습문항 관리",
+    "questionStructure": "문항구조 관리",
+    "questionType": "문항유형 관리",
+    "groupCode": "그룹코드관리",
+    "code": "코드관리"
+  },
+  "common": {
+    "search": "조회",
+    "register": "등록",
+    "save": "저장",
+    "delete": "삭제",
+    "cancel": "취소",
+    "confirm": "확인",
+    "prev": "PREV",
+    "next": "NEXT",
+    "noData": "데이터가 없습니다",
+    "deleteConfirm": "삭제하시겠습니까?",
+    "saveSuccess": "저장되었습니다",
+    "deleteSuccess": "삭제되었습니다",
+    "error": "오류가 발생했습니다",
+    "loading": "로딩 중...",
+    "rowsPerPage": "개씩 보기",
+    "listTitle": "조회목록",
+    "totalCount": "총 {count}건",
+    "deleted": "삭제"
+  },
+  "groupCode": {
+    "title": "그룹코드관리",
+    "groupCode": "그룹코드",
+    "groupName": "코드명",
+    "groupDesc": "코드설명",
+    "delYn": "삭제여부",
+    "insUser": "생성자",
+    "insDate": "생성시간",
+    "editTitle": "그룹 코드 수정",
+    "createTitle": "그룹 코드 등록",
+    "searchGroupCode": "그룹코드",
+    "searchCodeName": "코드명"
+  },
+  "code": {
+    "title": "코드관리",
+    "groupCode": "그룹코드",
+    "groupCodeName": "그룹코드명",
+    "code": "코드",
+    "codeName": "코드명",
+    "codeDesc": "코드설명",
+    "sortOrder": "소팅순서",
+    "delYn": "삭제여부",
+    "insUser": "생성자",
+    "insDate": "생성시간",
+    "editTitle": "코드 수정",
+    "createTitle": "코드 등록"
+  }
 }

@@ -5,7 +5,7 @@
 ## 기술 스택
 
 - **Framework**: Python FastAPI
-- **DB 드라이버**: psycopg2 (ORM 미사용, SQL 직접 작성)
+- **DB 드라이버**: psycopg v3 (ORM 미사용, SQL 직접 작성)
 - **인증**: python-jose (JWT)
 - **입력 검증**: Pydantic v2
 
@@ -16,7 +16,7 @@ backend/
 ├── app/
 │   ├── main.py          # FastAPI 앱 진입점, 미들웨어/라우터 등록
 │   ├── config.py         # 환경변수 로드 및 설정값 관리
-│   ├── database.py       # psycopg2 DB 커넥션 관리
+│   ├── database.py       # psycopg DB 커넥션 관리
 │   ├── routers/          # API 라우터 (도메인별 분리)
 │   ├── services/         # 비즈니스 로직 (라우터에서 호출)
 │   ├── models/           # Pydantic 요청/응답 스키마
@@ -61,8 +61,9 @@ cursor.execute(
 ### API 응답 형식
 
 - 성공 응답: `{ "data": ..., "message": "..." }`
-- 목록 응답: `{ "data": [...], "total": 100, "page": 1, "size": 20 }`
+- 목록 응답: `{ "data": [...], "total": 100, "page": 1, "size": 20 }` (size: 10/20/50 지원)
 - 에러 응답: `{ "detail": "에러 메시지" }` (FastAPI HTTPException 사용)
+- 날짜/시간 필드 포맷: `YYYY-MM-DD HH24:MI:SS` (예: 2026-03-17 15:20:04)
 
 ### 라우터 구성
 
@@ -77,8 +78,15 @@ cursor.execute(
 
 ## 환경변수
 
-| 변수명                 | 설명                   | 예시                                        |
-| ---------------------- | ---------------------- | ------------------------------------------- |
-| `DATABASE_URL`       | PostgreSQL 접속 문자열 | `postgresql://user:pass@host:5432/dbname` |
-| `JWT_SECRET_KEY`     | JWT 서명 비밀키        | (임의 문자열)                               |
-| `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분)      | `60`                                      |
+| 변수명                 | 설명                   | 예시                        |
+| ---------------------- | ---------------------- | --------------------------- |
+| `DB_HOST`            | DB 서버 호스트         | `59.19.146.192`           |
+| `DB_PORT`            | DB 서버 포트           | `5432`                    |
+| `DB_NAME`            | 데이터베이스명         | `tpk_db`                  |
+| `DB_USER`            | DB 사용자              | `tpk`                     |
+| `DB_PASSWORD`        | DB 비밀번호            | (비밀번호)                  |
+| `DB_SCHEMA`          | DB 스키마              | `public`                  |
+| `JWT_SECRET_KEY`     | JWT 서명 비밀키        | (임의 문자열)               |
+| `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분)      | `60`                      |
+
+> `config.py`에서 개별 환경변수를 조합하여 `DATABASE_URL`을 생성한다.
