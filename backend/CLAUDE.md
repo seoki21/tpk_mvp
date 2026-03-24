@@ -12,7 +12,7 @@
 ## 디렉토리 구조
 
 ```
-api/
+backend/
 ├── app/
 │   ├── main.py          # FastAPI 앱 진입점, 미들웨어/라우터 등록
 │   ├── config.py         # 환경변수 로드 및 설정값 관리
@@ -29,7 +29,7 @@ api/
 ## 개발 서버 실행
 
 ```bash
-cd api
+cd backend
 python -m venv venv
 source venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt

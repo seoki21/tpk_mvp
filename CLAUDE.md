@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 tpk_mvp/
-├── api/              # FastAPI 백엔드 API 서버
+├── backend/          # FastAPI 백엔드 API 서버
 ├── user-web/         # 사용자 웹 (Vue.js)
 ├── admin-web/        # 관리자 웹 (Vue.js)
 └── db_specs/         # DB 접속정보 및 테이블 명세서
@@ -34,7 +34,7 @@ tpk_mvp/
 
 ```bash
 # API 서버
-cd api
+cd backend
 source venv/Scripts/activate
 uvicorn app.main:app --reload
 
@@ -51,7 +51,7 @@ npm run dev
 
 ## 환경변수
 
-- API 서버 환경변수 (DB 접속정보, `JWT_SECRET_KEY` 등): `api/.env`
+- API 서버 환경변수 (DB 접속정보, `JWT_SECRET_KEY` 등): `backend/.env`
 - 테이블 명세서: `db_specs/tpk_table_spec_<yyyymmdd>.xlsx`
 
 ## DB 스크립트
