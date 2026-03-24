@@ -62,12 +62,15 @@ npm run dev
 - 조회 테이블 상단 바: 좌측에 `조회목록(총 N건)` 표시, 우측에 페이지당 행 수 선택 selectbox (10개, 20개, 50개, 기본 20개).
 - 삭제여부(del_yn) 컬럼 표시 규칙: `N` → 공백, `Y` → 빨간색 폰트로 '삭제' 표시.
 - 테이블 컬럼 헤더 클릭 시 오름차순/내림차순 정렬 (클라이언트 사이드). `sortable: false`로 특정 컬럼 정렬 비활성화 가능.
+- API 에러 발생 시 서버 응답의 `detail` 메시지를 alert 팝업으로 표시한다 (예: "이미 존재하는 그룹코드입니다."). 공통 Axios 인터셉터(`api/index.js`)에서 `error.detail`로 추출.
 
 ### 공통 화면 Layout
 
-* 기본 화면 레이아웃 : TPK_MVP/admin-web/layout_image/common_layout.png
+* 전체 레이아웃: 헤더(상단) + 사이드바(좌측, 다크 테마) + 콘텐츠(우측)
+  * 사이드바: 접기/펼치기 토글 지원 (헤더 ☰ 버튼). 접힘 시 아이콘만, 펼침 시 아이콘+텍스트.
 * 공통 조회 레이아웃 : TPK_MVP/admin-web/layout_image/common_search_layout.png
-  * 메인 타이틀, 서브 타이틀, 조회 조건, 테이블 리스트, 페이징 바로 구성
+  * 서브 타이틀, 조회 조건(SearchBar), 테이블 리스트(DataTable), 페이징 바(Pagination)로 구성
+  * SearchBar에 `hide-register` prop으로 등록 버튼 숨김 가능 (조회 전용 화면에서 사용)
 * 공통 팝업 레이아웃 : TPK_MVP/admin-web/layout_image/common_popup_layout.png
 
 노트 : 화면의 정의되어 있지 않는 경우 그룹코드 레이아웃과 유사항 패턴으로 생성한다.
@@ -75,12 +78,29 @@ npm run dev
 ### 화면
 
 - 사용자 관리
+  - 사용자 목록과 사용자 이력으로 구분된 형태
+    ![1774348670909](image/CLAUDE/1774348670909.png)
+  - 사용자 목록 : 현재 구현된 부분을 그대로 적용(생성시간 컬럼은 visiable=false)
+  - 사용자 이력 : <일단 비워둘 것>
 - 문항구조 관리
 - 문항유형 관리
 - 시험문항 관리
+  - 검색화면 정의 : 시험유형, 회차
+  - | 컬럼명   | UI 컨트롤 | 관련 TABLE                 | 검색조건          |
+    | 시험유형 | selectbox | tb_group_code의 group_code='exam_type' |                   |
+    | 토픽레벨 | selectbox | tb_group_code의 group_code='tpk_level' |                   |
+    | 회차   | text      | tb_exam_list의 round | like %round% |
+  - 조회 화면 컬럼 정의 : | 년도 | 시험유형 | 토픽레벨 | 회차 | 삭제여부 | 생성자 | 생성시간 |
+  - | 컬럼명   | 관련 TABLE                 |
+    | -------- | -------------------------- |
+    | 시험유형 | tb_exam_list의 exam_type으로 tb_group_code의 group_code='exam_type'의 group_name |
+    | 년도 | tb_exam_list의 exam_year|'년' |
+    | 회차 | tb_exam_list의 round |
+    | 토픽레벨 | tb_exam_list의 topik_level로 tb_group_code의 group_code='tpk_level'의 group_name |
+    | 영역 | tb_exam_list의 section으로 tb_group_code의 group_code='section'의 group_name |
+
 - 연습문항 관리
 - 그룹코드 관리
-
   - 검색화면 정의 : 그룹코드, 코드명
   - | 컬럼명   | UI 컨트롤 | 관련 TABLE                 | 검색조건          |
     | -------- | --------- | -------------------------- | ----------------- |
@@ -97,14 +117,14 @@ npm run dev
 - 코드 관리
 
   - 조회 화면 컬럼 정의 : 그룹코드 | 그룹코드명 | 코드 | 코드명 | 코드설명 | 소팅순서 | 삭제여부 | 생성자 | 생성시간 |
-  - | 컬럼명     | 관련 TABLE                   |
-    | ---------- | ---------------------------- |
-    | 그룹코드   | tb_group_code의 group_code   |
-    | 그룹코드명 | tb_group_code의 group_name   |
-    | 코드       | tb_code의 code               |
-    | 코드명     | tb_code의 code_name          |
-    | 코드설명   | tb_code의 code_desc          |
-    | 삭제여부   | tb_code의 del_yn             |
+  - | 컬럼명     | 관련 TABLE                 |
+    | ---------- | -------------------------- |
+    | 그룹코드   | tb_group_code의 group_code |
+    | 그룹코드명 | tb_group_code의 group_name |
+    | 코드       | tb_code의 code             |
+    | 코드명     | tb_code의 code_name        |
+    | 코드설명   | tb_code의 code_desc        |
+    | 삭제여부   | tb_code의 del_yn           |
   - 소팅 순서 : del_yn ASC, group_code ASC, sort_order ASC
 
 ### 다국어 (i18n)
@@ -128,3 +148,4 @@ npm run dev
 
 - Pinia 스토어는 도메인별로 분리한다.
 - 인증 상태는 `stores/auth.js`에서 관리한다.
+- 스토어의 fetchList에서 빈 문자열 검색 파라미터는 필터링 후 API에 전달한다 (FastAPI Optional 타입 파싱 오류 방지).

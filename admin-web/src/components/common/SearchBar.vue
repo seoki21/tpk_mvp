@@ -9,6 +9,14 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
+defineProps({
+  /** 등록 버튼 숨김 여부 (조회 전용 화면에서 사용) */
+  hideRegister: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const emit = defineEmits(['search', 'register'])
 </script>
 
@@ -28,6 +36,7 @@ const emit = defineEmits(['search', 'register'])
         {{ t('common.search') }}
       </button>
       <button
+        v-if="!hideRegister"
         class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
         @click="emit('register')"
       >

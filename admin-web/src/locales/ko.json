@@ -44,6 +44,30 @@
     "searchGroupCode": "그룹코드",
     "searchCodeName": "코드명"
   },
+  "examList": {
+    "title": "시험문항관리",
+    "examKey": "시험키",
+    "examYear": "년도",
+    "examType": "시험유형",
+    "topicLevel": "토픽레벨",
+    "round": "회차",
+    "section": "영역",
+    "delYn": "삭제여부",
+    "insUser": "생성자",
+    "insDate": "생성시간",
+    "editTitle": "시험문항 수정",
+    "createTitle": "시험문항 등록"
+  },
+  "user": {
+    "title": "사용자 관리",
+    "userKey": "사용자키",
+    "email": "이메일",
+    "providerType": "인증유형",
+    "delYn": "삭제여부",
+    "insDate": "생성시간",
+    "userList": "사용자 목록",
+    "userHistory": "사용자 이력"
+  },
   "code": {
     "title": "코드관리",
     "groupCode": "그룹코드",

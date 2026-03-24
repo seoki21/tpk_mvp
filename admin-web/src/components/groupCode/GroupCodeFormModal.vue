@@ -87,7 +87,7 @@ async function handleSave() {
     alert(t('common.saveSuccess'))
     emit('saved')
   } catch (error) {
-    alert(t('common.error'))
+    alert(error.detail || t('common.error'))
   }
 }
 
@@ -104,7 +104,7 @@ async function confirmDelete() {
     alert(t('common.deleteSuccess'))
     emit('saved')
   } catch (error) {
-    alert(t('common.error'))
+    alert(error.detail || t('common.error'))
   }
 }
 

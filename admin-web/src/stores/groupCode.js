@@ -42,10 +42,15 @@ export const useGroupCodeStore = defineStore('groupCode', () => {
   async function fetchList() {
     loading.value = true
     try {
+      /* 빈 문자열 파라미터 제거 */
+      const filtered = {}
+      for (const [k, v] of Object.entries(searchParams)) {
+        if (v !== '' && v !== null && v !== undefined) filtered[k] = v
+      }
       const params = {
         page: page.value,
         size: size.value,
-        ...searchParams
+        ...filtered
       }
       const res = await groupCodeApi.getList(params)
       list.value = res.list || res.data || []

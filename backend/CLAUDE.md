@@ -43,6 +43,7 @@ uvicorn app.main:app --reload
 - **파라미터 바인딩 필수**: `%s` 플레이스홀더 + 튜플 파라미터 사용. f-string이나 문자열 포맷으로 SQL에 값을 삽입하지 않는다.
 - 쿼리가 길 경우 여러 줄 문자열(`"""`)로 작성하고, 각 절(SELECT, FROM, WHERE 등)을 줄바꿈한다.
 - SQL 쿼리 위에 한글 주석으로 쿼리의 목적을 설명한다.
+- CUD(INSERT/UPDATE/DELETE) 후 RETURNING 대신 get 함수로 재조회하여 TO_CHAR 포맷 포함된 결과를 반환한다.
 
 ```python
 # 사용자 ID로 학습 이력 조회 (최근 순 정렬)

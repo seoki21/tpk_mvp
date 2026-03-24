@@ -1,20 +1,19 @@
 <!--
-  코드 등록/수정 모달 컴포넌트
+  시험문항 등록/수정 모달 컴포넌트
   - editData가 null이면 등록 모드, 객체이면 수정 모드
-  - 그룹코드 셀렉트박스는 groupCode 스토어의 allGroupCodes에서 가져온다.
-  - 등록 모드에서는 group_code과 code가 편집 가능, 수정 모드에서는 읽기 전용 (PK이므로)
+  - 시험유형, 토픽레벨, 영역 셀렉트박스는 examList 스토어의 코드 옵션에서 가져온다.
+  - 등록 모드에서는 exam_key가 자동 생성(SERIAL)이므로 표시하지 않는다.
+  - 수정 모드에서는 exam_key를 읽기 전용으로 표시한다.
 -->
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FormModal from '@/components/common/FormModal.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { useCodeStore } from '@/stores/code'
-import { useGroupCodeStore } from '@/stores/groupCode'
+import { useExamListStore } from '@/stores/examList'
 
 const { t } = useI18n()
-const codeStore = useCodeStore()
-const groupCodeStore = useGroupCodeStore()
+const store = useExamListStore()
 
 const props = defineProps({
   /** 모달 표시 여부 */
@@ -34,18 +33,19 @@ const emit = defineEmits(['close', 'saved'])
 /** 수정 모드 여부 판별 */
 const isEditMode = computed(() => props.editData !== null)
 
-/** 모달 타이틀 */
+/** 모달 타이틀 (등록/수정에 따라 변경) */
 const modalTitle = computed(() =>
-  isEditMode.value ? t('code.editTitle') : t('code.createTitle')
+  isEditMode.value ? t('examList.editTitle') : t('examList.createTitle')
 )
 
 /* ========== 폼 데이터 ========== */
 const form = ref({
-  group_code: '',
-  code: '',
-  code_name: '',
-  code_desc: '',
-  sort_order: 0,
+  exam_key: '',
+  exam_year: '',
+  exam_type: '',
+  topic_level: '',
+  round: '',
+  section: '',
   del_yn: 'N'
 })
 
@@ -55,28 +55,30 @@ watch(() => props.visible, (newVal) => {
     if (props.editData) {
       /* 수정 모드: 기존 데이터를 폼에 채움 */
       form.value = {
-        group_code: props.editData.group_code || '',
-        code: props.editData.code || '',
-        code_name: props.editData.code_name || '',
-        code_desc: props.editData.code_desc || '',
-        sort_order: props.editData.sort_order ?? 0,
+        exam_key: props.editData.exam_key || '',
+        exam_year: props.editData.exam_year || '',
+        exam_type: props.editData.exam_type || '',
+        topic_level: props.editData.topic_level || '',
+        round: props.editData.round ?? '',
+        section: props.editData.section || '',
         del_yn: props.editData.del_yn || 'N'
       }
     } else {
       /* 등록 모드: 빈 폼으로 초기화 */
       form.value = {
-        group_code: '',
-        code: '',
-        code_name: '',
-        code_desc: '',
-        sort_order: 0,
+        exam_key: '',
+        exam_year: '',
+        exam_type: '',
+        topic_level: '',
+        round: '',
+        section: '',
         del_yn: 'N'
       }
     }
 
-    /* 그룹코드 목록이 비어 있으면 가져옴 */
-    if (groupCodeStore.allGroupCodes.length === 0) {
-      groupCodeStore.fetchAllGroupCodes()
+    /* 코드 옵션이 비어 있으면 가져옴 */
+    if (store.examTypeOptions.length === 0) {
+      store.fetchCodeOptions()
     }
   }
 })
@@ -88,14 +90,22 @@ const showConfirm = ref(false)
 async function handleSave() {
   try {
     if (isEditMode.value) {
-      await codeStore.update(form.value.group_code, form.value.code, {
-        code_name: form.value.code_name,
-        code_desc: form.value.code_desc,
-        sort_order: form.value.sort_order,
+      await store.update(form.value.exam_key, {
+        exam_year: form.value.exam_year,
+        exam_type: form.value.exam_type,
+        topic_level: form.value.topic_level,
+        round: form.value.round,
+        section: form.value.section,
         del_yn: form.value.del_yn
       })
     } else {
-      await codeStore.create(form.value)
+      await store.create({
+        exam_year: form.value.exam_year,
+        exam_type: form.value.exam_type,
+        topic_level: form.value.topic_level,
+        round: form.value.round,
+        section: form.value.section
+      })
     }
     alert(t('common.saveSuccess'))
     emit('saved')
@@ -113,7 +123,7 @@ function handleDelete() {
 async function confirmDelete() {
   showConfirm.value = false
   try {
-    await codeStore.remove(form.value.group_code, form.value.code)
+    await store.remove(form.value.exam_key)
     alert(t('common.deleteSuccess'))
     emit('saved')
   } catch (error) {
@@ -137,88 +147,108 @@ function cancelDelete() {
     @delete="handleDelete"
   >
     <div class="space-y-4">
-      <!-- 그룹코드 -->
-      <div class="flex items-center">
+      <!-- 시험키 (수정 모드에서만 읽기 전용 표시) -->
+      <div v-if="isEditMode" class="flex items-center">
         <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.groupCode') }}
+          {{ t('examList.examKey') }}
         </label>
-        <select
-          v-if="!isEditMode"
-          v-model="form.group_code"
-          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-        >
-          <option value=""></option>
-          <option
-            v-for="gc in groupCodeStore.allGroupCodes"
-            :key="gc.group_code"
-            :value="gc.group_code"
-          >
-            {{ gc.group_code }} - {{ gc.group_name }}
-          </option>
-        </select>
         <input
-          v-else
-          :value="form.group_code"
+          :value="form.exam_key"
           type="text"
           readonly
           class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-100"
         />
       </div>
 
-      <!-- 코드 -->
+      <!-- 년도 -->
       <div class="flex items-center">
         <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.code') }}
+          {{ t('examList.examYear') }}
         </label>
         <input
-          v-model.number="form.code"
+          v-model="form.exam_year"
+          type="text"
+          maxlength="4"
+          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+        />
+      </div>
+
+      <!-- 시험유형 -->
+      <div class="flex items-center">
+        <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
+          {{ t('examList.examType') }}
+        </label>
+        <select
+          v-model="form.exam_type"
+          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+        >
+          <option value=""></option>
+          <option
+            v-for="opt in store.examTypeOptions"
+            :key="opt.code"
+            :value="opt.code"
+          >
+            {{ opt.code_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 토픽레벨 -->
+      <div class="flex items-center">
+        <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
+          {{ t('examList.topicLevel') }}
+        </label>
+        <select
+          v-model="form.topic_level"
+          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+        >
+          <option value=""></option>
+          <option
+            v-for="opt in store.tpkLevelOptions"
+            :key="opt.code"
+            :value="opt.code"
+          >
+            {{ opt.code_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 회차 -->
+      <div class="flex items-center">
+        <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
+          {{ t('examList.round') }}
+        </label>
+        <input
+          v-model.number="form.round"
           type="number"
           class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-          :readonly="isEditMode"
-          :class="{ 'bg-gray-100': isEditMode }"
         />
       </div>
 
-      <!-- 코드명 -->
+      <!-- 영역 -->
       <div class="flex items-center">
         <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.codeName') }}
+          {{ t('examList.section') }}
         </label>
-        <input
-          v-model="form.code_name"
-          type="text"
+        <select
+          v-model="form.section"
           class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-        />
-      </div>
-
-      <!-- 코드설명 -->
-      <div class="flex items-center">
-        <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.codeDesc') }}
-        </label>
-        <input
-          v-model="form.code_desc"
-          type="text"
-          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-        />
-      </div>
-
-      <!-- 소팅순서 -->
-      <div class="flex items-center">
-        <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.sortOrder') }}
-        </label>
-        <input
-          v-model.number="form.sort_order"
-          type="number"
-          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
-        />
+        >
+          <option value=""></option>
+          <option
+            v-for="opt in store.sectionOptions"
+            :key="opt.code"
+            :value="opt.code"
+          >
+            {{ opt.code_name }}
+          </option>
+        </select>
       </div>
 
       <!-- 삭제여부 (수정 모드에서만 표시) -->
       <div v-if="isEditMode" class="flex items-center">
         <label class="w-28 text-sm font-medium text-gray-700 shrink-0">
-          {{ t('code.delYn') }}
+          {{ t('examList.delYn') }}
         </label>
         <select
           v-model="form.del_yn"

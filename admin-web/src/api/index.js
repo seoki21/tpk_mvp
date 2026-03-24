@@ -20,6 +20,9 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     console.error('[API Error]', error.response?.status, error.response?.data || error.message)
+    /* 서버 에러 응답에서 detail 메시지를 추출하여 error.detail에 설정 */
+    const detail = error.response?.data?.detail || error.message || '알 수 없는 오류'
+    error.detail = detail
     return Promise.reject(error)
   }
 )

@@ -29,16 +29,17 @@ const router = createRouter({
           name: 'codes',
           component: () => import('../views/CodeListView.vue')
         },
-        /* 아래 메뉴는 추후 구현 예정 — placeholder */
+        /* 사용자관리 */
         {
           path: 'users',
           name: 'users',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/UserListView.vue')
         },
+        /* 시험문항관리 */
         {
           path: 'exam-questions',
           name: 'examQuestions',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/ExamListView.vue')
         },
         {
           path: 'practice-questions',
