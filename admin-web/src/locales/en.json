@@ -1,2 +1,85 @@
 {
+  "app": {
+    "title": "TPK Pilot UI"
+  },
+  "menu": {
+    "userManagement": "User Management",
+    "examQuestion": "Exam Questions",
+    "practiceQuestion": "Practice Questions",
+    "questionStructure": "Question Structure",
+    "questionType": "Question Type",
+    "groupCode": "Group Code",
+    "code": "Code"
+  },
+  "common": {
+    "search": "Search",
+    "register": "Register",
+    "save": "Save",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "prev": "PREV",
+    "next": "NEXT",
+    "noData": "No data available",
+    "deleteConfirm": "Are you sure you want to delete?",
+    "saveSuccess": "Saved successfully",
+    "deleteSuccess": "Deleted successfully",
+    "error": "An error occurred",
+    "loading": "Loading...",
+    "rowsPerPage": "rows per page",
+    "listTitle": "List",
+    "totalCount": "Total {count}",
+    "deleted": "Deleted"
+  },
+  "groupCode": {
+    "title": "Group Code Management",
+    "groupCode": "Group Code",
+    "groupName": "Code Name",
+    "groupDesc": "Code Description",
+    "delYn": "Deleted",
+    "insUser": "Created By",
+    "insDate": "Created At",
+    "editTitle": "Edit Group Code",
+    "createTitle": "Register Group Code",
+    "searchGroupCode": "Group Code",
+    "searchCodeName": "Code Name"
+  },
+  "examList": {
+    "title": "Exam Question Management",
+    "examKey": "Exam Key",
+    "examYear": "Year",
+    "examType": "Exam Type",
+    "topicLevel": "TOPIK Level",
+    "round": "Round",
+    "section": "Section",
+    "delYn": "Deleted",
+    "insUser": "Created By",
+    "insDate": "Created At",
+    "editTitle": "Edit Exam Question",
+    "createTitle": "Register Exam Question"
+  },
+  "user": {
+    "title": "User Management",
+    "userKey": "User Key",
+    "email": "Email",
+    "providerType": "Auth Type",
+    "delYn": "Deleted",
+    "insDate": "Created At",
+    "userList": "User List",
+    "userHistory": "User History"
+  },
+  "code": {
+    "title": "Code Management",
+    "groupCode": "Group Code",
+    "groupCodeName": "Group Code Name",
+    "code": "Code",
+    "codeName": "Code Name",
+    "codeDesc": "Code Description",
+    "sortOrder": "Sort Order",
+    "delYn": "Deleted",
+    "insUser": "Created By",
+    "insDate": "Created At",
+    "editTitle": "Edit Code",
+    "createTitle": "Register Code"
+  }
 }

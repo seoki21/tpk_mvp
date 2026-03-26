@@ -1,7 +1,7 @@
 """
 시험문항 서비스 모듈
 tb_exam_list 테이블에 대한 CRUD 비즈니스 로직을 처리한다.
-psycopg v3 raw SQL을 사용하며 ORM은 사용하지 않는다.
+psycopg (v3) raw SQL을 사용하며 ORM은 사용하지 않는다.
 """
 from typing import Optional
 from app.database import get_connection
@@ -112,12 +112,13 @@ def get_exam(exam_key: int) -> Optional[dict]:
         conn.close()
 
 
-def create_exam(data: dict) -> dict:
+def create_exam(data: dict, user: str = "admin") -> dict:
     """
     새로운 시험문항을 생성한다.
 
     Args:
         data: exam_year, exam_type, round, topic_level, section을 포함한 딕셔너리
+        user: 등록/수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         생성된 시험문항 정보 딕셔너리
@@ -126,11 +127,13 @@ def create_exam(data: dict) -> dict:
     try:
         cursor = conn.cursor()
         # 시험문항 신규 등록 (del_yn 기본값 'N', 등록일시 현재시각)
+        # RETURNING으로 생성된 PK를 안전하게 조회 (lastval() 대비 동시성 안전)
         cursor.execute(
             """
             INSERT INTO tb_exam_list (exam_year, exam_type, round, topic_level, section,
                                       del_yn, ins_date, ins_user, upd_date, upd_user)
-            VALUES (%s, %s, %s, %s, %s, 'N', NOW(), 'admin', NOW(), 'admin')
+            VALUES (%s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
+            RETURNING exam_key
             """,
             (
                 data["exam_year"],
@@ -138,13 +141,14 @@ def create_exam(data: dict) -> dict:
                 data.get("round"),
                 data.get("topic_level"),
                 data["section"],
+                user,
+                user,
             ),
         )
+        new_key = cursor.fetchone()["exam_key"]
         conn.commit()
 
-        # INSERT 후 생성된 exam_key를 조회하여 포맷된 결과 반환
-        cursor.execute("SELECT lastval() AS exam_key")
-        new_key = cursor.fetchone()["exam_key"]
+        # INSERT 후 포맷된 날짜를 포함한 결과를 조회하여 반환
         return get_exam(new_key)
     except Exception:
         conn.rollback()
@@ -153,7 +157,7 @@ def create_exam(data: dict) -> dict:
         conn.close()
 
 
-def update_exam(exam_key: int, data: dict) -> Optional[dict]:
+def update_exam(exam_key: int, data: dict, user: str = "admin") -> Optional[dict]:
     """
     기존 시험문항 정보를 수정한다.
     전달된 필드 중 None이 아닌 값만 업데이트한다.
@@ -161,6 +165,7 @@ def update_exam(exam_key: int, data: dict) -> Optional[dict]:
     Args:
         exam_key: 수정할 시험문항 PK
         data: 수정할 필드 딕셔너리
+        user: 수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         수정된 시험문항 정보 딕셔너리 또는 None
@@ -183,7 +188,8 @@ def update_exam(exam_key: int, data: dict) -> Optional[dict]:
 
         # 수정일시, 수정자 자동 설정
         set_clauses.append("upd_date = NOW()")
-        set_clauses.append("upd_user = 'admin'")
+        set_clauses.append("upd_user = %s")
+        params.append(user)
         params.append(exam_key)
 
         update_sql = f"""
@@ -202,13 +208,14 @@ def update_exam(exam_key: int, data: dict) -> Optional[dict]:
         conn.close()
 
 
-def delete_exam(exam_key: int) -> Optional[dict]:
+def delete_exam(exam_key: int, user: str = "admin") -> Optional[dict]:
     """
     시험문항을 논리 삭제(소프트 딜리트)한다.
     del_yn을 'Y'로 변경하고 수정일시를 갱신한다.
 
     Args:
         exam_key: 삭제할 시험문항 PK
+        user: 수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         삭제 처리된 시험문항 정보 딕셔너리 또는 None
@@ -220,10 +227,10 @@ def delete_exam(exam_key: int) -> Optional[dict]:
         cursor.execute(
             """
             UPDATE tb_exam_list
-               SET del_yn = 'Y', upd_date = NOW(), upd_user = 'admin'
+               SET del_yn = 'Y', upd_date = NOW(), upd_user = %s
              WHERE exam_key = %s
             """,
-            (exam_key,),
+            (user, exam_key),
         )
         conn.commit()
         # DELETE 후 포맷된 날짜를 포함한 결과를 조회하여 반환

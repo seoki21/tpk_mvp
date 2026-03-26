@@ -1,7 +1,7 @@
 """
 그룹코드 서비스 모듈
 tb_group_code 테이블에 대한 CRUD 비즈니스 로직을 처리한다.
-psycopg2 raw SQL을 사용하며 ORM은 사용하지 않는다.
+psycopg (v3) raw SQL을 사용하며 ORM은 사용하지 않는다.
 """
 from typing import Optional
 from app.database import get_connection
@@ -124,12 +124,13 @@ def get_group_code(group_code: str) -> Optional[dict]:
         conn.close()
 
 
-def create_group_code(data: dict) -> dict:
+def create_group_code(data: dict, user: str = "admin") -> dict:
     """
     새로운 그룹코드를 생성한다.
 
     Args:
         data: group_code, group_name, group_desc를 포함한 딕셔너리
+        user: 등록자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         생성된 그룹코드 정보 딕셔너리
@@ -141,9 +142,9 @@ def create_group_code(data: dict) -> dict:
         cursor.execute(
             """
             INSERT INTO tb_group_code (group_code, group_name, group_desc, del_yn, ins_date, ins_user)
-            VALUES (%s, %s, %s, 'N', NOW(), 'admin')
+            VALUES (%s, %s, %s, 'N', NOW(), %s)
             """,
-            (data["group_code"], data["group_name"], data.get("group_desc")),
+            (data["group_code"], data["group_name"], data.get("group_desc"), user),
         )
         conn.commit()
         # INSERT 후 포맷된 날짜를 포함한 결과를 조회하여 반환
@@ -155,7 +156,7 @@ def create_group_code(data: dict) -> dict:
         conn.close()
 
 
-def update_group_code(group_code: str, data: dict) -> Optional[dict]:
+def update_group_code(group_code: str, data: dict, user: str = "admin") -> Optional[dict]:
     """
     기존 그룹코드 정보를 수정한다.
     전달된 필드 중 None이 아닌 값만 업데이트한다.
@@ -163,6 +164,7 @@ def update_group_code(group_code: str, data: dict) -> Optional[dict]:
     Args:
         group_code: 수정할 그룹코드
         data: 수정할 필드 딕셔너리
+        user: 수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         수정된 그룹코드 정보 딕셔너리 또는 None
@@ -185,7 +187,8 @@ def update_group_code(group_code: str, data: dict) -> Optional[dict]:
 
         # 수정일시, 수정자 자동 설정
         set_clauses.append("upd_date = NOW()")
-        set_clauses.append("upd_user = 'admin'")
+        set_clauses.append("upd_user = %s")
+        params.append(user)
         params.append(group_code)
 
         update_sql = f"""
@@ -204,13 +207,14 @@ def update_group_code(group_code: str, data: dict) -> Optional[dict]:
         conn.close()
 
 
-def delete_group_code(group_code: str) -> Optional[dict]:
+def delete_group_code(group_code: str, user: str = "admin") -> Optional[dict]:
     """
     그룹코드를 논리 삭제(소프트 딜리트)한다.
     del_yn을 'Y'로 변경하고 수정일시를 갱신한다.
 
     Args:
         group_code: 삭제할 그룹코드
+        user: 수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
         삭제 처리된 그룹코드 정보 딕셔너리 또는 None
@@ -222,10 +226,10 @@ def delete_group_code(group_code: str) -> Optional[dict]:
         cursor.execute(
             """
             UPDATE tb_group_code
-               SET del_yn = 'Y', upd_date = NOW(), upd_user = 'admin'
+               SET del_yn = 'Y', upd_date = NOW(), upd_user = %s
              WHERE group_code = %s
             """,
-            (group_code,),
+            (user, group_code),
         )
         conn.commit()
         # DELETE 후 포맷된 날짜를 포함한 결과를 조회하여 반환

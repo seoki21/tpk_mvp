@@ -1,20 +1,31 @@
 """
 테이블/컬럼 COMMENT 추가 스크립트
 엑셀 테이블정의서에서 한글 코멘트를 읽어 PostgreSQL에 적용한다.
+psycopg v3를 사용하며, DB 접속정보는 backend/.env에서 로드한다.
 """
+import os
 import openpyxl
-import psycopg2
+import psycopg
+from dotenv import load_dotenv
 
-wb = openpyxl.load_workbook("D:/Projects/tpk_mvp/db_specs/tpk_table_spec_20260321.xlsx")
+# backend/.env 파일에서 DB 접속정보 로드
+env_path = os.path.join(os.path.dirname(__file__), "..", "backend", ".env")
+load_dotenv(env_path)
 
-conn = psycopg2.connect(
-    host="59.19.146.192",
-    port=5432,
-    dbname="tpk_db",
-    user="tpk",
-    password="tpk00"
-)
-conn.autocommit = True
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "tpk_db")
+DB_USER = os.getenv("DB_USER", "tpk")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# 엑셀 파일 경로 — 스크립트와 같은 디렉토리의 최신 명세서 사용
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), "tpk_table_spec_20260321.xlsx")
+
+wb = openpyxl.load_workbook(EXCEL_PATH)
+
+conn = psycopg.connect(DATABASE_URL, autocommit=True)
 cur = conn.cursor()
 
 total = 0

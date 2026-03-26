@@ -2,17 +2,26 @@
 테이블 생성 스크립트
 tb_group_code, tb_code는 이미 존재하므로 제외.
 나머지 11개 테이블을 FK 의존성 순서대로 생성한다.
+psycopg v3를 사용하며, DB 접속정보는 backend/.env에서 로드한다.
 """
-import psycopg2
+import os
+import sys
+from dotenv import load_dotenv
+import psycopg
 
-conn = psycopg2.connect(
-    host="59.19.146.192",
-    port=5432,
-    dbname="tpk_db",
-    user="tpk",
-    password="tpk00"
-)
-conn.autocommit = False
+# backend/.env 파일에서 DB 접속정보 로드
+env_path = os.path.join(os.path.dirname(__file__), "..", "backend", ".env")
+load_dotenv(env_path)
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "tpk_db")
+DB_USER = os.getenv("DB_USER", "tpk")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+conn = psycopg.connect(DATABASE_URL, autocommit=False)
 cur = conn.cursor()
 
 sqls = [
