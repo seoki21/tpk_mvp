@@ -87,9 +87,7 @@ function handleSelect(file) {
       </div>
 
       <!-- 파일 없음 -->
-      <div v-else class="px-3 py-2 text-sm text-gray-400">
-        파일이 없습니다
-      </div>
+      <div v-else class="px-3 py-2 text-sm text-gray-400">파일이 없습니다</div>
     </div>
   </Teleport>
 </template>

@@ -9,7 +9,7 @@ const BASE_URL = '/api/v1/exam-list';
 
 /**
  * 시험문항 목록 조회 (페이징/검색 파라미터 포함)
- * @param {Object} params - 검색 조건 (page, size, exam_type, topic_level, round 등)
+ * @param {Object} params - 검색 조건 (page, size, exam_type, tpk_level, round 등)
  */
 export function getList(params) {
   return api.get(BASE_URL, { params });

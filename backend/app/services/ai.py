@@ -49,7 +49,7 @@ def generate_feedback(
     correct_answer: str,
     user_answer: str,
     question_type: Optional[str] = None,
-    topic_level: Optional[str] = None,
+    tpk_level: Optional[str] = None,
     language: str = "ko",
 ) -> dict:
     """
@@ -61,7 +61,7 @@ def generate_feedback(
         correct_answer: 정답
         user_answer: 사용자 답변
         question_type: 문제 유형 (읽기, 듣기, 쓰기 등)
-        topic_level: 토픽 레벨 (TOPIK I, TOPIK II 등)
+        tpk_level: 토픽 레벨 (TOPIK I, TOPIK II 등)
         language: 응답 언어 (ko/en/ja)
 
     Returns:
@@ -82,8 +82,8 @@ def generate_feedback(
     # 사용자 메시지 조합 — 문제 정보를 구조화하여 전달
     user_message_parts = []
 
-    if topic_level:
-        user_message_parts.append(f"[토픽 레벨] {topic_level}")
+    if tpk_level:
+        user_message_parts.append(f"[토픽 레벨] {tpk_level}")
     if question_type:
         user_message_parts.append(f"[문제 유형] {question_type}")
 

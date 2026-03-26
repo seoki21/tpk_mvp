@@ -8,6 +8,7 @@
 - **DB 드라이버**: psycopg v3 (ORM 미사용, SQL 직접 작성)
 - **인증**: python-jose (JWT)
 - **입력 검증**: Pydantic v2
+- **AI 연동**: anthropic SDK (Claude API)
 
 ## 디렉토리 구조
 
@@ -63,7 +64,7 @@ cursor.execute(
 ### API 응답 형식
 
 - 성공 응답: `{ "data": ..., "message": "..." }`
-- 목록 응답: `{ "data": [...], "total": 100, "page": 1, "size": 20 }` (size: 10/20/50 지원)
+- 목록 응답: `{ "data": [...], "total": 100, "page": 1, "size": 20 }` (size: 10/20/50 지원, 최대 100)
 - 에러 응답: `{ "detail": "에러 메시지" }` (FastAPI HTTPException 사용)
 - 날짜/시간 필드 포맷: `YYYY-MM-DD HH24:MI:SS` (예: 2026-03-17 15:20:04)
 
@@ -92,6 +93,8 @@ cursor.execute(
 | `JWT_SECRET_KEY`     | JWT 서명 비밀키        | (임의 문자열)               |
 | `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분)      | `60`                      |
 | `UPLOAD_DIR`         | 파일 업로드 저장 경로  | `./uploads` (기본값)       |
+| `ANTHROPIC_API_KEY`  | Anthropic API 키       | (API 키)                   |
+| `ANTHROPIC_MODEL`    | Claude 모델명          | `claude-sonnet-4-6`      |
 
 > `config.py`에서 개별 환경변수를 조합하여 `DATABASE_URL`을 생성한다.
 
@@ -100,3 +103,26 @@ cursor.execute(
 - 업로드 파일은 `{UPLOAD_DIR}/exam/{exam_key}/` 하위에 UUID 기반 파일명으로 저장
 - 메타데이터는 `tb_exam_file` 테이블에 저장 (상대 경로)
 - API 경로: `/api/v1/exam-list/{exam_key}/files` (GET, POST, DELETE, download)
+
+## 기출문제/지시문 관리
+
+- 문제(`tb_exam_question`)와 지시문(`tb_exam_instruction`)의 CRUD
+- API 경로: `/api/v1/exam-list/{exam_key}/questions` (GET, POST bulk-save)
+- UPSERT 방식: 있으면 UPDATE, 없으면 INSERT
+
+## 기출문항 PDF → JSON 변환
+
+- Claude API의 PDF(document) 분석 기능을 사용하여 기출문제 PDF를 JSON으로 변환
+- API 경로: `POST /api/v1/exam-list/{exam_key}/convert`
+- **SSE 스트리밍**: `AsyncAnthropic` + `client.messages.stream()` → `StreamingResponse(text/event-stream)`
+  - 이벤트: `start`(시작), `text_delta`(텍스트 청크), `done`(완료+토큰사용량+stop_reason), `error`(에러)
+- PDF를 base64 인코딩하여 Claude API에 전송
+- `max_tokens: 64000` (대용량 PDF 대응)
+- 프롬프트는 `services/exam_convert.py`의 `_PDF_CONVERT_PROMPT`에 정의
+- 프론트엔드: `fetch` + `ReadableStream`으로 SSE 수신 (axios 미사용)
+
+## AI 피드백
+
+- TOPIK 문제에 대한 AI 기반 학습 피드백 생성
+- API 경로: `POST /api/v1/ai/feedback`
+- 한국어/영어/일본어 응답 지원

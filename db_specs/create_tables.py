@@ -63,7 +63,7 @@ sqls = [
         exam_key    SERIAL       NOT NULL,
         exam_type   VARCHAR(20)  NOT NULL,
         round       INTEGER,
-        topic_level VARCHAR(10),
+        tpk_level   VARCHAR(10),
         del_yn      VARCHAR(1)   NOT NULL DEFAULT 'N',
         ins_date    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
         ins_user    VARCHAR(50)  NOT NULL DEFAULT 'admin',

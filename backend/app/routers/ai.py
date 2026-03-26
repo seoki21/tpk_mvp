@@ -25,7 +25,7 @@ def generate_feedback(body: AIFeedbackRequest):
             correct_answer=body.correct_answer,
             user_answer=body.user_answer,
             question_type=body.question_type,
-            topic_level=body.topic_level,
+            tpk_level=body.tpk_level,
             language=body.language,
         )
         return BaseResponse(data=result, message="피드백 생성 성공")

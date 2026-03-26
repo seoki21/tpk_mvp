@@ -78,7 +78,7 @@ corepack pnpm run format      # 코드 포매팅
 - 관리자 WEB (`admin-web/`)
   - 사용자 관리
   - 시험관리(기출) — PDF 파일 업로드 포함 (`tb_exam_file`)
-  - 기출문제 관리
+  - 기출문제 관리 — 기출문항 변환(JSON) 팝업 포함 (Claude API 연동)
   - 연습문제 관리
   - 문항구조 관리
   - 문항유형 관리
@@ -88,3 +88,12 @@ corepack pnpm run format      # 코드 포매팅
   - 학습 대시보드
   - 시험문제(기출 및 모의)
   - 연습문제
+
+## AI 연동
+
+- **Claude API** (Anthropic): `anthropic` Python SDK 사용 (`AsyncAnthropic` 비동기 클라이언트)
+- 기출문항 PDF → JSON 변환: PDF를 Claude API로 분석하여 문제/지시문 JSON 생성
+  - SSE(Server-Sent Events) 스트리밍으로 실시간 결과 전달
+  - `max_tokens: 64000`, 프론트엔드 타임아웃: 300초
+- AI 피드백: 학습 문제에 대한 AI 기반 피드백 생성
+- 환경변수: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (`backend/.env`)

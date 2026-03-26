@@ -19,7 +19,7 @@ router = APIRouter(
 @router.get("", response_model=PaginatedResponse)
 def list_exam_list(
     exam_type: Optional[str] = Query(None, description="시험유형 코드 (정확 일치)"),
-    topic_level: Optional[str] = Query(None, description="토픽레벨 코드 (정확 일치)"),
+    tpk_level: Optional[str] = Query(None, description="토픽레벨 코드 (정확 일치)"),
     round: Optional[int] = Query(None, description="회차 (정수 정확 일치)"),
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(20, ge=1, le=100, description="페이지당 항목 수"),
@@ -28,7 +28,7 @@ def list_exam_list(
     try:
         rows, total = exam_list_service.list_exam_list(
             exam_type=exam_type,
-            topic_level=topic_level,
+            tpk_level=tpk_level,
             round=round,
             page=page,
             size=size,

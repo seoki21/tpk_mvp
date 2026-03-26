@@ -10,36 +10,36 @@ from app.utils.pagination import get_limit_offset
 
 # 시험문항 목록/상세 조회에서 사용하는 공통 SELECT 절 (코드명 LEFT JOIN 포함)
 _BASE_SELECT = """
-    SELECT e.exam_key, e.exam_year, e.exam_type, e.round, e.topic_level, e.section,
+    SELECT e.exam_key, e.exam_year, e.exam_type, e.round, e.tpk_level, e.section,
            e.del_yn,
            TO_CHAR(e.ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, e.ins_user,
            TO_CHAR(e.upd_date, 'YYYY-MM-DD HH24:MI:SS') AS upd_date, e.upd_user,
            et.code_name AS exam_type_name,
-           tl.code_name AS topic_level_name,
+           tl.code_name AS tpk_level_name,
            sc.code_name AS section_name,
            (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
               FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N') AS has_file
       FROM tb_exam_list e
       LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(e.exam_type AS INTEGER)
-      LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.topic_level AS INTEGER)
+      LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.tpk_level AS INTEGER)
       LEFT JOIN tb_code sc ON sc.group_code = 'section' AND sc.code = CAST(e.section AS INTEGER)
 """
 
 
 def list_exam_list(
     exam_type: Optional[str] = None,
-    topic_level: Optional[str] = None,
+    tpk_level: Optional[str] = None,
     round: Optional[int] = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[dict], int]:
     """
     시험문항 목록을 페이지네이션하여 조회한다.
-    검색 조건(exam_type, topic_level, round)은 정확 일치로 동적 적용된다.
+    검색 조건(exam_type, tpk_level, round)은 정확 일치로 동적 적용된다.
 
     Args:
         exam_type: 시험유형 코드 (정확 일치)
-        topic_level: 토픽레벨 코드 (정확 일치)
+        tpk_level: 토픽레벨 코드 (정확 일치)
         round: 회차 (정수 정확 일치)
         page: 페이지 번호
         size: 페이지당 항목 수
@@ -58,9 +58,9 @@ def list_exam_list(
         if exam_type:
             conditions.append("e.exam_type = %s")
             params.append(exam_type)
-        if topic_level:
-            conditions.append("e.topic_level = %s")
-            params.append(topic_level)
+        if tpk_level:
+            conditions.append("e.tpk_level = %s")
+            params.append(tpk_level)
         if round is not None:
             conditions.append("e.round = %s")
             params.append(round)
@@ -119,7 +119,7 @@ def create_exam(data: dict, user: str = "admin") -> dict:
     새로운 시험문항을 생성한다.
 
     Args:
-        data: exam_year, exam_type, round, topic_level, section을 포함한 딕셔너리
+        data: exam_year, exam_type, round, tpk_level, section을 포함한 딕셔너리
         user: 등록/수정자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
@@ -132,7 +132,7 @@ def create_exam(data: dict, user: str = "admin") -> dict:
         # RETURNING으로 생성된 PK를 안전하게 조회 (lastval() 대비 동시성 안전)
         cursor.execute(
             """
-            INSERT INTO tb_exam_list (exam_year, exam_type, round, topic_level, section,
+            INSERT INTO tb_exam_list (exam_year, exam_type, round, tpk_level, section,
                                       del_yn, ins_date, ins_user, upd_date, upd_user)
             VALUES (%s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
             RETURNING exam_key
@@ -141,7 +141,7 @@ def create_exam(data: dict, user: str = "admin") -> dict:
                 data["exam_year"],
                 data["exam_type"],
                 data.get("round"),
-                data.get("topic_level"),
+                data.get("tpk_level"),
                 data["section"],
                 user,
                 user,
@@ -179,7 +179,7 @@ def update_exam(exam_key: int, data: dict, user: str = "admin") -> Optional[dict
         # None이 아닌 필드만 SET 절에 추가 (동적 UPDATE 구성)
         set_clauses = []
         params = []
-        for field in ["exam_year", "exam_type", "round", "topic_level", "section", "del_yn"]:
+        for field in ["exam_year", "exam_type", "round", "tpk_level", "section", "del_yn"]:
             if data.get(field) is not None:
                 set_clauses.append(f"{field} = %s")
                 params.append(data[field])

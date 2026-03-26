@@ -13,7 +13,7 @@ class AIFeedbackRequest(BaseModel):
     correct_answer: str = Field(..., description="정답")
     user_answer: str = Field(..., description="사용자가 선택/입력한 답")
     question_type: Optional[str] = Field(None, description="문제 유형 (예: 읽기, 듣기, 쓰기)")
-    topic_level: Optional[str] = Field(None, description="토픽 레벨 (예: TOPIK I, TOPIK II)")
+    tpk_level: Optional[str] = Field(None, description="토픽 레벨 (예: TOPIK I, TOPIK II)")
     language: str = Field("ko", description="응답 언어 (ko/en/ja)")
 
 

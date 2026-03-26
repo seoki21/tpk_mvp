@@ -11,7 +11,7 @@ class ExamListCreate(BaseModel):
     exam_year: str = Field(..., max_length=4, description="시험연도")
     exam_type: str = Field(..., max_length=20, description="시험유형 코드")
     round: Optional[int] = Field(None, description="회차")
-    topic_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
+    tpk_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
     section: str = Field(..., max_length=20, description="영역 코드")
 
 
@@ -20,6 +20,6 @@ class ExamListUpdate(BaseModel):
     exam_year: Optional[str] = Field(None, max_length=4, description="시험연도")
     exam_type: Optional[str] = Field(None, max_length=20, description="시험유형 코드")
     round: Optional[int] = Field(None, description="회차")
-    topic_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
+    tpk_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
     section: Optional[str] = Field(None, max_length=20, description="영역 코드")
     del_yn: Optional[str] = Field(None, max_length=1, description="삭제여부 (Y/N)")

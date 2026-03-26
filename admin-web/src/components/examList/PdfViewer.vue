@@ -30,7 +30,7 @@ defineProps({
 
     <!-- PDF 표시 영역 -->
     <div v-if="url">
-      <iframe :src="url" class="h-[600px] w-full border-0" />
+      <iframe :src="url" class="h-[600px] w-full border-0"></iframe>
     </div>
     <div v-else class="flex h-[600px] items-center justify-center bg-gray-50 text-gray-400">
       파일을 선택하세요

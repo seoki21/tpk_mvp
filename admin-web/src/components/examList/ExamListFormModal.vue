@@ -47,7 +47,7 @@ const form = ref({
   exam_key: '',
   exam_year: '',
   exam_type: '',
-  topic_level: '',
+  tpk_level: '',
   round: '',
   section: '',
   del_yn: 'N'
@@ -79,7 +79,7 @@ watch(
           exam_key: props.editData.exam_key || '',
           exam_year: props.editData.exam_year || '',
           exam_type: props.editData.exam_type || '',
-          topic_level: props.editData.topic_level || '',
+          tpk_level: props.editData.tpk_level || '',
           round: props.editData.round ?? '',
           section: props.editData.section || '',
           del_yn: props.editData.del_yn || 'N'
@@ -92,7 +92,7 @@ watch(
           exam_key: '',
           exam_year: '',
           exam_type: '',
-          topic_level: '',
+          tpk_level: '',
           round: '',
           section: '',
           del_yn: 'N'
@@ -238,7 +238,7 @@ async function handleSave() {
       await store.update(form.value.exam_key, {
         exam_year: form.value.exam_year,
         exam_type: form.value.exam_type,
-        topic_level: form.value.topic_level,
+        tpk_level: form.value.tpk_level,
         round: form.value.round,
         section: form.value.section,
         del_yn: form.value.del_yn
@@ -249,7 +249,7 @@ async function handleSave() {
       const result = await store.create({
         exam_year: form.value.exam_year,
         exam_type: form.value.exam_type,
-        topic_level: form.value.topic_level,
+        tpk_level: form.value.tpk_level,
         round: form.value.round,
         section: form.value.section
       });
@@ -349,7 +349,7 @@ function cancelDelete() {
       <div class="flex items-center">
         <label class="w-28 shrink-0 text-sm font-medium text-gray-700">토픽레벨</label>
         <select
-          v-model="form.topic_level"
+          v-model="form.tpk_level"
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value=""></option>

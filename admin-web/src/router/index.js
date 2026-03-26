@@ -41,11 +41,11 @@ const router = createRouter({
           name: 'examQuestions',
           component: () => import('../views/ExamListView.vue')
         },
-        /* 기출문항관리 */
+        /* 기출문제관리 */
         {
           path: 'past-exam-questions',
           name: 'pastExamQuestions',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/PastExamQuestionView.vue')
         },
         {
           path: 'practice-questions',

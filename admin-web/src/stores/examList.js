@@ -30,7 +30,7 @@ export const useExamListStore = defineStore('examList', () => {
   /** 검색 조건 */
   const searchParams = reactive({
     exam_type: '',
-    topic_level: '',
+    tpk_level: '',
     round: ''
   });
 
