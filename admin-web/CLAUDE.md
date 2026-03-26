@@ -91,7 +91,7 @@ corepack pnpm run format      # Prettier 포매팅
 - 시험관리(기출)
 
   - 화면 예시
-    ![1774501473511](image/CLAUDE/1774501473511.png)
+    ![1774519666660](image/CLAUDE/1774519666660.png)
   - 등록/수정 팝업 하단에 기출문제(PDF) 파일 업로드 영역
     - 시험유형이 '기출문제'(code=1)인 경우에만 업로드 활성화 (기본 비활성)
     - 다중 파일 업로드 + 드래그앤드롭 지원
@@ -105,19 +105,75 @@ corepack pnpm run format      # Prettier 포매팅
   - 팝업 크기: `max-w-2xl` (FormModal의 `maxWidth` prop 사용)
 - 기출문제 관리
 
-  - 검색화면 정의 : 시험유형, 회차
-  - | 컬럼명   | UI 컨트롤 | 관련 TABLE                 | 검색조건          |
-    | 시험유형 | selectbox | tb_group_code의 group_code='exam_type' |                   |
-    | 토픽레벨 | selectbox | tb_group_code의 group_code='tpk_level' |                   |
-    | 회차   | text      | tb_exam_list의 round | like %round% |
-  - 조회 화면 컬럼 정의 : | 년도 | 시험유형 | 토픽레벨 | 회차 | 삭제여부 | 생성자 | 생성시간 |
-  - | 컬럼명   | 관련 TABLE                                                                       |
-    | -------- | -------------------------------------------------------------------------------- |
-    | 시험유형 | tb_exam_list의 exam_type으로 tb_group_code의 group_code='exam_type'의 group_name |
-    | 년도     | tb_exam_list의 exam_year                                                         |
-    | 회차     | tb_exam_list의 round                                                             |
-    | 토픽레벨 | tb_exam_list의 topik_level로 tb_group_code의 group_code='tpk_level'의 group_name |
-    | 영역     | tb_exam_list의 section으로 tb_group_code의 group_code='section'의 group_name     |
+  - 화면예시
+
+    ![1774519769232](image/CLAUDE/1774519769232.png)
+  - 상단 조회조건
+
+    - 기출문제 : tb_exam_list 의 데이터를 조회하여 selectbox
+    - 파일 : 선택된 tb_exam_list의 exam_key와 매칭되는 tb_exam_file 목록의 selectbox
+    - 파일 selectbox 옆에 file icon 위치함
+    - file icon 클릭시 '기출문항 변환(JSON) 팝업'이 모달형태로 실행되고 기출문제 정보와 파일 정보를 parameter로 팝업에 넘겨줘야 함.
+  - 하단 목록 화면
+
+    - 문제 목록(JSON -> 화면)
+    - JSON 텍스트를 우측에 출력하고 JSON format을 기반으로 우측 영역에 UI를 그릴 것
+    - JSON 텍스트는 tb_exam_question 테이블과 tb_exam_instruction 테이블의 데이터를 union all 하여 차례로 출력
+    - 메모 : 우측 영역에 UI를 그리는 방법은 추후 정의
+- 기출문항 변환(JSON) 팝업
+
+  * 화면예시
+
+    ![1774520738825](image/CLAUDE/1774520738825.png)
+  * 기출 제목은 예시 형태로 출력
+  * '기출문제 관리' 화면에서 parameter로 넘겨준 기출정보와 파일 정보를 토대로 화면을 구성
+
+    * 하단좌측영역은 pdf 뷰어로 해당 파일을 출력
+    * 하단우측영역은 'JSON 변환' 버튼을 클릭시 클로드 API와 연동하여 아래의 프롬프트를 실행하여 결과 값을 출력
+    * ```
+      첨부의 기출문제를 분석하고 json으로 변환해줘(읽기 유형만)
+
+      1. 아래 유형의 지시문
+         * 유형
+            * ※ [1~2] ( )에 들어갈 말로 가장 알맞은 것을 고르십시오. (각 2점)
+            * 지시문 하단에 문단이 제시되어 있으면 paragraph key 값에 추가
+         * json key 값
+            * item_type : 'I'
+            * full_sentence : ex. ※ [1~2] ( )에 들어갈 말로 가장 알맞은 것을 고르십시오. (각 2점)
+            * paragraph : full_sentence 아래 문단 내용
+            * no_list : 번호 목록, ex. [1, 2]
+            * instruction : ex. ( )에 들어갈 말로 가장 알맞은 것을 고르십시오.
+            * score : 점수, ex. 2
+
+      2. 문제 유형
+         * json key 값
+            * item_type : 'Q'
+            * no : 문제 번호
+            * score : 점수
+            * section : 읽기, 쓰기, ...
+            * type : 문제 유형
+            * question_text : 문제
+            * choices : 선택 옵션
+               * 선택 옵션의 번호는 아래와 같이 동그라미 형식으로 해줄 것
+               * "choices": ["1 식당", "2 은행", "3 공원", "4 서점"]
+            * correct_answer : 정답 (동그라미 형식이 아닌 숫자 형식으로 출력)
+            * feedback : 피드백
+      	     * 선택 옵션 번호별 피드백
+      		 * 번호별 정답여부와 피드백내용이 추가
+      		 * 정답여부에서 정답이면 'T', 오답이면 'F'
+      		 * 피드백내용은 한글로 정답이면 정답 피드백, 오답이면 오답피드백
+      		 * 피드백내용은 간결하고 읽기 좋게 20~40자 내외로 정리하고 한글의 경우 존대어를 사용한다.
+               * "feedback": ["1:정답여부_피드백내용", "2:정답여부_피드백내용", "3:정답여부_피드백내용", "4:정답여부_피드백내용"]
+
+      3. 기타 사항
+         * json 순서는 번호 순서
+         * json의 지시문 위치는 no_list의 번호 앞에 위치
+         * 문항 중 json 파싱이 불가능한 문제는 위 예시가 아닌 notes 필드에 별도 정리
+            * notes : 파싱이 불가능한 번호와 불가능한 이유를 별도로 정리
+         * notes 필드는 번호와 불가능한 이유를 알기 쉽게 요약해서 정리
+         * notes 필드는 맨 아래 별도 json 형식으로 정리
+      ```
+    * '저장' 버튼 클릭시 '저장하시겠습니까?'라는 confirm 창을 출력하고 '예'를 선택하면 문제유형은 tb_exam_question 에 저장하고 지시문 유형은 tb_exam_instruction에 저장
 - 연습문제 관리
 - 문항구조 관리
 - 문항유형 관리
