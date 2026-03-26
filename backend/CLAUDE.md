@@ -21,6 +21,7 @@ backend/
 │   ├── services/         # 비즈니스 로직 (라우터에서 호출)
 │   ├── models/           # Pydantic 요청/응답 스키마
 │   └── utils/            # 공통 유틸리티 (인증, 페이징 등)
+├── uploads/              # 파일 업로드 저장 경로 (git 미추적)
 ├── requirements.txt
 ├── .env                  # 환경변수 (git 미추적)
 └── CLAUDE.md
@@ -33,7 +34,7 @@ cd backend
 python -m venv venv
 source venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
 ```
 
 ## 코딩 규칙
@@ -71,6 +72,7 @@ cursor.execute(
 - 도메인별로 라우터 파일 분리 (예: `routers/users.py`, `routers/exams.py`)
 - URL 접두사: `/api/v1/{도메인}`
 - 라우터 함수에 한글 docstring 작성
+- **라우터 등록 순서 주의**: 하위 경로 라우터(예: `exam_file`의 `/{exam_key}/files`)를 상위 경로 라우터(예: `exam_list`의 `/{exam_key}`)보다 **먼저 등록**해야 경로 충돌을 방지한다.
 
 ### 에러 처리
 
@@ -89,5 +91,12 @@ cursor.execute(
 | `DB_SCHEMA`          | DB 스키마              | `public`                  |
 | `JWT_SECRET_KEY`     | JWT 서명 비밀키        | (임의 문자열)               |
 | `JWT_EXPIRE_MINUTES` | JWT 만료 시간(분)      | `60`                      |
+| `UPLOAD_DIR`         | 파일 업로드 저장 경로  | `./uploads` (기본값)       |
 
 > `config.py`에서 개별 환경변수를 조합하여 `DATABASE_URL`을 생성한다.
+
+## 파일 업로드
+
+- 업로드 파일은 `{UPLOAD_DIR}/exam/{exam_key}/` 하위에 UUID 기반 파일명으로 저장
+- 메타데이터는 `tb_exam_file` 테이블에 저장 (상대 경로)
+- API 경로: `/api/v1/exam-list/{exam_key}/files` (GET, POST, DELETE, download)

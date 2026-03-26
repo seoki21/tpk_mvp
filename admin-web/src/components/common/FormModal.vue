@@ -6,10 +6,6 @@
   - 오버레이 클릭 또는 X 버튼으로 닫기
 -->
 <script setup>
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 defineProps({
   /** 모달 표시 여부 */
   visible: {
@@ -25,19 +21,24 @@ defineProps({
   showDelete: {
     type: Boolean,
     default: false
+  },
+  /** 모달 최대 너비 Tailwind 클래스 (기본: max-w-lg) */
+  maxWidth: {
+    type: String,
+    default: 'max-w-lg'
   }
-})
+});
 
-const emit = defineEmits(['close', 'save', 'delete'])
+const emit = defineEmits(['close', 'save', 'delete']);
 
 /** 오버레이 클릭 시 모달 닫기 */
 function onOverlayClick() {
-  emit('close')
+  emit('close');
 }
 
 /** 모달 내부 클릭 이벤트 전파 차단 */
 function onModalClick(e) {
-  e.stopPropagation()
+  e.stopPropagation();
 }
 </script>
 
@@ -49,15 +50,12 @@ function onModalClick(e) {
       @click="onOverlayClick"
     >
       <!-- 모달 박스 -->
-      <div
-        class="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4"
-        @click="onModalClick"
-      >
+      <div :class="['mx-4 w-full rounded-lg bg-white shadow-lg', maxWidth]" @click="onModalClick">
         <!-- 타이틀 바 -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 class="text-lg font-semibold text-gray-800">{{ title }}</h2>
           <button
-            class="w-8 h-8 flex items-center justify-center bg-gray-800 text-white rounded hover:bg-gray-700 text-sm font-bold"
+            class="flex h-8 w-8 items-center justify-center rounded bg-gray-800 text-sm font-bold text-white hover:bg-gray-700"
             @click="emit('close')"
           >
             X
@@ -66,23 +64,23 @@ function onModalClick(e) {
 
         <!-- 본문 영역 (슬롯) -->
         <div class="px-6 py-4">
-          <slot />
+          <slot></slot>
         </div>
 
         <!-- 하단 버튼 바 -->
-        <div class="flex items-center justify-center gap-3 px-6 py-4 border-t border-gray-200">
+        <div class="flex items-center justify-center gap-3 border-t border-gray-200 px-6 py-4">
           <button
-            class="px-6 py-2 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
             @click="emit('save')"
           >
-            {{ t('common.save') }}
+            저장
           </button>
           <button
             v-if="showDelete"
-            class="px-6 py-2 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
             @click="emit('delete')"
           >
-            {{ t('common.delete') }}
+            삭제
           </button>
         </div>
       </div>

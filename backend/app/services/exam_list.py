@@ -16,7 +16,9 @@ _BASE_SELECT = """
            TO_CHAR(e.upd_date, 'YYYY-MM-DD HH24:MI:SS') AS upd_date, e.upd_user,
            et.code_name AS exam_type_name,
            tl.code_name AS topic_level_name,
-           sc.code_name AS section_name
+           sc.code_name AS section_name,
+           (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
+              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N') AS has_file
       FROM tb_exam_list e
       LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(e.exam_type AS INTEGER)
       LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.topic_level AS INTEGER)

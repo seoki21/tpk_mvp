@@ -5,42 +5,40 @@
   - 각 목록 페이지에서 재사용한다.
 -->
 <script setup>
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 defineProps({
   /** 등록 버튼 숨김 여부 (조회 전용 화면에서 사용) */
   hideRegister: {
     type: Boolean,
     default: false
   }
-})
+});
 
-const emit = defineEmits(['search', 'register'])
+const emit = defineEmits(['search', 'register']);
 </script>
 
 <template>
-  <div class="flex items-center justify-between border border-gray-300 rounded px-4 py-3 mb-4 bg-gray-50">
+  <div
+    class="mb-4 flex items-center justify-between rounded border border-gray-300 bg-gray-50 px-4 py-3"
+  >
     <!-- 검색 필드 영역 (슬롯) -->
-    <div class="flex items-center gap-4 flex-wrap">
-      <slot />
+    <div class="flex flex-wrap items-center gap-4">
+      <slot></slot>
     </div>
 
     <!-- 조회/등록 버튼 영역 -->
-    <div class="flex items-center gap-2 ml-4 shrink-0">
+    <div class="ml-4 flex shrink-0 items-center gap-2">
       <button
-        class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+        class="rounded border border-gray-400 bg-gray-200 px-4 py-1.5 text-sm hover:bg-gray-300"
         @click="emit('search')"
       >
-        {{ t('common.search') }}
+        조회
       </button>
       <button
         v-if="!hideRegister"
-        class="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+        class="rounded border border-gray-400 bg-gray-200 px-4 py-1.5 text-sm hover:bg-gray-300"
         @click="emit('register')"
       >
-        {{ t('common.register') }}
+        등록
       </button>
     </div>
   </div>

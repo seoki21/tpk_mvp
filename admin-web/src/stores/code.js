@@ -3,33 +3,33 @@
  * - 코드 목록 조회, 상세 조회, 생성, 수정, 삭제 기능
  * - 검색 조건과 페이징 상태를 관리한다.
  */
-import { defineStore } from 'pinia'
-import { ref, reactive } from 'vue'
-import * as codeApi from '@/api/code'
+import { defineStore } from 'pinia';
+import { ref, reactive } from 'vue';
+import * as codeApi from '@/api/code';
 
 export const useCodeStore = defineStore('code', () => {
   /* ========== 상태 ========== */
 
   /** 코드 목록 (페이징된 결과) */
-  const list = ref([])
+  const list = ref([]);
 
   /** 전체 건수 */
-  const total = ref(0)
+  const total = ref(0);
 
   /** 현재 페이지 (1부터 시작) */
-  const page = ref(1)
+  const page = ref(1);
 
   /** 페이지당 항목 수 */
-  const size = ref(20)
+  const size = ref(20);
 
   /** 로딩 상태 */
-  const loading = ref(false)
+  const loading = ref(false);
 
   /** 검색 조건 */
   const searchParams = reactive({
     group_code: '',
     code_name: ''
-  })
+  });
 
   /* ========== 액션 ========== */
 
@@ -37,25 +37,25 @@ export const useCodeStore = defineStore('code', () => {
    * 코드 목록 조회 (검색 조건 + 페이징 적용)
    */
   async function fetchList() {
-    loading.value = true
+    loading.value = true;
     try {
       /* 빈 문자열 파라미터 제거 */
-      const filtered = {}
+      const filtered = {};
       for (const [k, v] of Object.entries(searchParams)) {
-        if (v !== '' && v !== null && v !== undefined) filtered[k] = v
+        if (v !== '' && v !== null && v !== undefined) filtered[k] = v;
       }
       const params = {
         page: page.value,
         size: size.value,
         ...filtered
-      }
-      const res = await codeApi.getList(params)
-      list.value = res.list || res.data || []
-      total.value = res.total || 0
+      };
+      const res = await codeApi.getList(params);
+      list.value = res.list || res.data || [];
+      total.value = res.total || 0;
     } catch (error) {
-      console.error('[Code Store] fetchList 실패:', error)
+      console.error('[Code Store] fetchList 실패:', error);
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
@@ -67,10 +67,10 @@ export const useCodeStore = defineStore('code', () => {
    */
   async function fetchDetail(codeGroup, code) {
     try {
-      return await codeApi.getDetail(codeGroup, code)
+      return await codeApi.getDetail(codeGroup, code);
     } catch (error) {
-      console.error('[Code Store] fetchDetail 실패:', error)
-      throw error
+      console.error('[Code Store] fetchDetail 실패:', error);
+      throw error;
     }
   }
 
@@ -80,11 +80,11 @@ export const useCodeStore = defineStore('code', () => {
    */
   async function create(data) {
     try {
-      const res = await codeApi.create(data)
-      return res
+      const res = await codeApi.create(data);
+      return res;
     } catch (error) {
-      console.error('[Code Store] create 실패:', error)
-      throw error
+      console.error('[Code Store] create 실패:', error);
+      throw error;
     }
   }
 
@@ -96,11 +96,11 @@ export const useCodeStore = defineStore('code', () => {
    */
   async function update(codeGroup, code, data) {
     try {
-      const res = await codeApi.update(codeGroup, code, data)
-      return res
+      const res = await codeApi.update(codeGroup, code, data);
+      return res;
     } catch (error) {
-      console.error('[Code Store] update 실패:', error)
-      throw error
+      console.error('[Code Store] update 실패:', error);
+      throw error;
     }
   }
 
@@ -111,11 +111,11 @@ export const useCodeStore = defineStore('code', () => {
    */
   async function remove(codeGroup, code) {
     try {
-      const res = await codeApi.remove(codeGroup, code)
-      return res
+      const res = await codeApi.remove(codeGroup, code);
+      return res;
     } catch (error) {
-      console.error('[Code Store] remove 실패:', error)
-      throw error
+      console.error('[Code Store] remove 실패:', error);
+      throw error;
     }
   }
 
@@ -131,5 +131,5 @@ export const useCodeStore = defineStore('code', () => {
     create,
     update,
     remove
-  }
-})
+  };
+});

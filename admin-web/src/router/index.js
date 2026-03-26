@@ -3,7 +3,7 @@
  * AdminLayout을 부모 라우트로 사용하고, 각 페이지를 children으로 배치한다.
  * 아직 미구현된 페이지는 DashboardView를 placeholder로 사용한다.
  */
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -35,11 +35,17 @@ const router = createRouter({
           name: 'users',
           component: () => import('../views/UserListView.vue')
         },
-        /* 시험문항관리 */
+        /* 기출시험관리 */
         {
           path: 'exam-questions',
           name: 'examQuestions',
           component: () => import('../views/ExamListView.vue')
+        },
+        /* 기출문항관리 */
+        {
+          path: 'past-exam-questions',
+          name: 'pastExamQuestions',
+          component: () => import('../views/DashboardView.vue')
         },
         {
           path: 'practice-questions',
@@ -59,6 +65,6 @@ const router = createRouter({
       ]
     }
   ]
-})
+});
 
-export default router
+export default router;

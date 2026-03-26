@@ -6,11 +6,9 @@
   - transition-all duration-300 애니메이션
 -->
 <script setup>
-import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute } from 'vue-router';
 
-const { t } = useI18n()
-const route = useRoute()
+const route = useRoute();
 
 defineProps({
   /** 사이드바 접힘 상태 */
@@ -18,30 +16,31 @@ defineProps({
     type: Boolean,
     default: false
   }
-})
+});
 
 /* 메뉴 항목 정의 — 아이콘 + 라벨 + 경로 */
 const menuItems = [
-  { icon: '👤', label: 'menu.userManagement', path: '/users' },
-  { icon: '📝', label: 'menu.examQuestion', path: '/exam-questions' },
-  { icon: '📋', label: 'menu.practiceQuestion', path: '/practice-questions' },
-  { icon: '🏗', label: 'menu.questionStructure', path: '/question-structures' },
-  { icon: '📂', label: 'menu.questionType', path: '/question-types' },
-  { icon: '🏷', label: 'menu.groupCode', path: '/group-codes' },
-  { icon: '🔢', label: 'menu.code', path: '/codes' }
-]
+  { icon: '👤', label: '사용자 관리', path: '/users' },
+  { icon: '📝', label: '시험관리(기출)', path: '/exam-questions' },
+  { icon: '📄', label: '기출문제 관리', path: '/past-exam-questions' },
+  { icon: '📋', label: '연습문제 관리', path: '/practice-questions' },
+  { icon: '🏗', label: '문항구조 관리', path: '/question-structures' },
+  { icon: '📂', label: '문항유형 관리', path: '/question-types' },
+  { icon: '🏷', label: '그룹코드관리', path: '/group-codes' },
+  { icon: '🔢', label: '코드관리', path: '/codes' }
+];
 
 /**
  * 현재 경로와 메뉴 경로가 일치하는지 확인
  */
 function isActive(path) {
-  return route.path === path
+  return route.path === path;
 }
 </script>
 
 <template>
   <nav
-    class="bg-gray-800 text-gray-300 flex flex-col overflow-hidden transition-all duration-300 shrink-0"
+    class="flex shrink-0 flex-col overflow-hidden bg-gray-800 text-gray-300 transition-all duration-300"
     :class="collapsed ? 'w-16' : 'w-56'"
   >
     <!-- 메뉴 리스트 -->
@@ -50,32 +49,31 @@ function isActive(path) {
         v-for="item in menuItems"
         :key="item.path"
         :to="item.path"
-        class="relative flex items-center h-11 mx-2 my-0.5 rounded-lg transition-colors group"
-        :class="isActive(item.path)
-          ? 'bg-blue-600/20 text-white'
-          : 'hover:bg-gray-700 text-gray-400 hover:text-gray-200'"
-        :title="collapsed ? t(item.label) : ''"
+        class="group relative mx-2 my-0.5 flex h-11 items-center rounded-lg transition-colors"
+        :class="
+          isActive(item.path)
+            ? 'bg-blue-600/20 text-white'
+            : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+        "
+        :title="collapsed ? item.label : ''"
       >
         <!-- 활성 메뉴 좌측 인디케이터 바 -->
         <div
           v-if="isActive(item.path)"
-          class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-blue-500 rounded-r"
+          class="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r bg-blue-500"
         ></div>
 
         <!-- 아이콘 -->
         <span
-          class="shrink-0 text-base flex items-center justify-center"
-          :class="collapsed ? 'w-12 ml-0' : 'w-10 ml-2'"
+          class="flex shrink-0 items-center justify-center text-base"
+          :class="collapsed ? 'ml-0 w-12' : 'ml-2 w-10'"
         >
           {{ item.icon }}
         </span>
 
         <!-- 라벨 (펼침 상태에서만 표시) -->
-        <span
-          v-if="!collapsed"
-          class="text-sm whitespace-nowrap overflow-hidden"
-        >
-          {{ t(item.label) }}
+        <span v-if="!collapsed" class="overflow-hidden whitespace-nowrap text-sm">
+          {{ item.label }}
         </span>
       </router-link>
     </div>

@@ -9,14 +9,14 @@
 - **상태 관리**: Pinia
 - **라우팅**: Vue Router 4
 - **스타일**: Tailwind CSS
-- **다국어**: vue-i18n (한국어 고정, 구조만 유지)
+- **UI 언어**: 한국어 고정 (다국어 미적용, vue-i18n 미사용)
 
 ## 디렉토리 구조
 
 ```
 admin-web/
 ├── src/
-│   ├── main.js           # 앱 진입점 (Vue, Pinia, Router, i18n 초기화)
+│   ├── main.js           # 앱 진입점 (Vue, Pinia, Router 초기화)
 │   ├── App.vue           # 루트 컴포넌트
 │   ├── router/           # Vue Router 라우트 정의
 │   │   └── index.js
@@ -24,11 +24,8 @@ admin-web/
 │   ├── views/            # 페이지 단위 컴포넌트
 │   ├── components/       # 재사용 가능한 공통 컴포넌트
 │   ├── composables/      # Vue 컴포저블 (재사용 로직)
-│   ├── api/              # API 호출 모듈
-│   └── locales/          # i18n 번역 리소스
-│       ├── ko.json       # 한국어 (기본)
-│       ├── en.json       # English
-│       └── ja.json       # 日本語
+│   └── api/              # API 호출 모듈
+├── eslint.config.js      # ESLint v9 flat config
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -40,8 +37,16 @@ admin-web/
 
 ```bash
 cd admin-web
-npm install
-npm run dev
+corepack pnpm install
+corepack pnpm run dev
+```
+
+## 코드 품질
+
+```bash
+corepack pnpm run lint        # ESLint 검사
+corepack pnpm run lint:fix    # ESLint 자동 수정
+corepack pnpm run format      # Prettier 포매팅
 ```
 
 ## 코딩 규칙
@@ -78,29 +83,46 @@ npm run dev
 ### 화면
 
 - 사용자 관리
+
   - 사용자 목록과 사용자 이력으로 구분된 형태
     ![1774348670909](image/CLAUDE/1774348670909.png)
   - 사용자 목록 : 현재 구현된 부분을 그대로 적용(생성시간 컬럼은 visiable=false)
   - 사용자 이력 : <일단 비워둘 것>
-- 문항구조 관리
-- 문항유형 관리
-- 시험문항 관리
+- 시험관리(기출)
+
+  - 화면 예시
+    ![1774501473511](image/CLAUDE/1774501473511.png)
+  - 등록/수정 팝업 하단에 기출문제(PDF) 파일 업로드 영역
+    - 시험유형이 '기출문제'(code=1)인 경우에만 업로드 활성화 (기본 비활성)
+    - 다중 파일 업로드 + 드래그앤드롭 지원
+    - 등록 모드: 파일을 pendingFiles에 보관 → 저장 시 시험정보 저장 후 순차 업로드
+    - 수정 모드: 즉시 업로드 + 기존 파일 목록 표시/삭제
+    - 파일 저장 테이블: `tb_exam_file` (FK: `tb_exam_list.exam_key`)
+    - 비-PDF 파일 업로드 시 에러: '기출문제 파일 형식이 PDF가 아닌 것 같으니 확인 바랍니다.'
+  - 조회 목록에 '파일' 컬럼: PDF 업로드 여부를 파일 아이콘(SVG) / 공백으로 표시
+  - 파일 아이콘 클릭 시 팝업 메뉴로 파일 목록 표시 → 선택 시 하단 '파일 보기' 영역에 PDF 인라인 렌더링
+  - 다른 행 클릭 시 파일 보기 영역 초기화
+  - 팝업 크기: `max-w-2xl` (FormModal의 `maxWidth` prop 사용)
+- 기출문제 관리
+
   - 검색화면 정의 : 시험유형, 회차
   - | 컬럼명   | UI 컨트롤 | 관련 TABLE                 | 검색조건          |
     | 시험유형 | selectbox | tb_group_code의 group_code='exam_type' |                   |
     | 토픽레벨 | selectbox | tb_group_code의 group_code='tpk_level' |                   |
     | 회차   | text      | tb_exam_list의 round | like %round% |
   - 조회 화면 컬럼 정의 : | 년도 | 시험유형 | 토픽레벨 | 회차 | 삭제여부 | 생성자 | 생성시간 |
-  - | 컬럼명   | 관련 TABLE                 |
-    | -------- | -------------------------- |
+  - | 컬럼명   | 관련 TABLE                                                                       |
+    | -------- | -------------------------------------------------------------------------------- |
     | 시험유형 | tb_exam_list의 exam_type으로 tb_group_code의 group_code='exam_type'의 group_name |
-    | 년도 | tb_exam_list의 exam_year|'년' |
-    | 회차 | tb_exam_list의 round |
+    | 년도     | tb_exam_list의 exam_year                                                         |
+    | 회차     | tb_exam_list의 round                                                             |
     | 토픽레벨 | tb_exam_list의 topik_level로 tb_group_code의 group_code='tpk_level'의 group_name |
-    | 영역 | tb_exam_list의 section으로 tb_group_code의 group_code='section'의 group_name |
-
-- 연습문항 관리
+    | 영역     | tb_exam_list의 section으로 tb_group_code의 group_code='section'의 group_name     |
+- 연습문제 관리
+- 문항구조 관리
+- 문항유형 관리
 - 그룹코드 관리
+
   - 검색화면 정의 : 그룹코드, 코드명
   - | 컬럼명   | UI 컨트롤 | 관련 TABLE                 | 검색조건          |
     | -------- | --------- | -------------------------- | ----------------- |
@@ -127,16 +149,15 @@ npm run dev
     | 삭제여부   | tb_code의 del_yn           |
   - 소팅 순서 : del_yn ASC, group_code ASC, sort_order ASC
 
-### 다국어 (i18n)
+### UI 텍스트
 
-- **모든 UI 텍스트는 반드시 `t()` 함수를 통해 출력한다.** 템플릿에 한글을 직접 쓰지 않는다.
-- i18n 키는 도트 표기법으로 계층 구분: `admin.user.title`, `common.save`
-- 새 페이지/컴포넌트 추가 시 ko.json에 키를 추가한다 (관리자 화면은 한국어 고정).
+- 관리자 웹은 다국어를 사용하지 않는다. 모든 UI 텍스트는 한국어를 직접 작성한다.
+- vue-i18n, `t()` 함수를 사용하지 않는다.
 
 ### API 호출
 
 - `src/api/` 디렉토리에 도메인별로 API 호출 함수를 모듈화한다.
-- API 베이스 URL은 환경변수(`VITE_API_BASE_URL`)로 관리한다.
+- 개발 환경에서는 `VITE_API_BASE_URL`을 비워 Vite 프록시(`vite.config.js`의 `/api` → `http://localhost:8001`)를 사용한다.
 
 ### 라우팅
 

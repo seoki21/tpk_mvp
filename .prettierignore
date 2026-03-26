@@ -1,0 +1,6 @@
+node_modules
+dist
+backend
+db_specs
+*.md
+package-lock.json

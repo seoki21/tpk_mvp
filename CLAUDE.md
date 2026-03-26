@@ -9,13 +9,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend**: Python FastAPI
 - **Frontend**: Tailwind CSS 기반 Vue.js + Vite + Pinia + Vue Router
 - **Database**: PostgreSQL (원격 개발 DB 서버)
-- **i18n**: vue-i18n
+- **i18n**: vue-i18n (사용자 웹 전용)
 
 ## 핵심 제약사항
 
 - DB 접근은 ORM을 사용하지 않는다. psycopg(v3)로 SQL을 직접 작성한다.
 - 시험 문제 본문/선택지는 다국어 번역하지 않는다 (한국어 원문 유지).
-- UI 텍스트는 반드시 vue-i18n 리소스 파일을 통해 다국어 처리한다. 하드코딩 금지.
+- **사용자 웹(user-web)**: UI 텍스트는 반드시 vue-i18n 리소스 파일을 통해 다국어 처리한다. 하드코딩 금지.
+- **관리자 웹(admin-web)**: 다국어를 사용하지 않는다. 한국어를 직접 작성한다.
 - 코드에 한글 주석을 상세하게 작성한다. (함수 목적/파라미터, SQL 쿼리 의도, 복잡한 로직, Vue 컴포넌트 역할)
 
 ## 디렉토리 구조
@@ -33,20 +34,33 @@ tpk_mvp/
 ## 개발 환경 명령어 (Windows Git Bash)
 
 ```bash
-# API 서버
+# API 서버 (포트 8001 사용)
 cd backend
 source venv/Scripts/activate
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
+
+# 관리자 웹 (pnpm 사용 — corepack 경유)
+cd admin-web
+corepack pnpm install
+corepack pnpm run dev
 
 # 사용자 웹
 cd user-web
-npm install
-npm run dev
+corepack pnpm install
+corepack pnpm run dev
+```
 
-# 관리자 웹
+## 코드 품질 (ESLint / Prettier)
+
+- ESLint v9 flat config + Prettier가 admin-web에 설정되어 있다.
+- Prettier 설정(`.prettierrc`)은 프로젝트 루트에 위치하여 양쪽 프론트엔드에서 공유한다.
+- Tailwind CSS 클래스 자동 정렬: `prettier-plugin-tailwindcss`
+
+```bash
 cd admin-web
-npm install
-npm run dev
+corepack pnpm run lint        # 코드 품질 검사
+corepack pnpm run lint:fix    # 자동 수정
+corepack pnpm run format      # 코드 포매팅
 ```
 
 ## 환경변수
@@ -63,10 +77,11 @@ npm run dev
 
 - 관리자 WEB (`admin-web/`)
   - 사용자 관리
+  - 시험관리(기출) — PDF 파일 업로드 포함 (`tb_exam_file`)
+  - 기출문제 관리
+  - 연습문제 관리
   - 문항구조 관리
   - 문항유형 관리
-  - 시험문항 관리
-  - 연습문항 관리
   - 그룹코드 관리
   - 코드 관리
 - 사용자 WEB (`user-web/`)

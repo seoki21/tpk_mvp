@@ -73,7 +73,24 @@ sqls = [
     )
     """,
 
-    # 4. tb_user_device : 사용자 디바이스
+    # 4. tb_exam_file : 시험 파일
+    """
+    CREATE TABLE tb_exam_file (
+        pdf_key     SERIAL        NOT NULL,
+        exam_key    INTEGER       NOT NULL,
+        file_name   VARCHAR(255)  NOT NULL,
+        file_path   VARCHAR(500)  NOT NULL,
+        file_size   INTEGER,
+        sort_order  INTEGER       DEFAULT 0,
+        del_yn      VARCHAR(1)    NOT NULL DEFAULT 'N',
+        ins_date    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user    VARCHAR(50)   NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_exam_file PRIMARY KEY (pdf_key),
+        CONSTRAINT fk_exam_file_exam FOREIGN KEY (exam_key) REFERENCES tb_exam_list(exam_key)
+    )
+    """,
+
+    # 5. tb_user_device : 사용자 디바이스
     """
     CREATE TABLE tb_user_device (
         user_key    INTEGER      NOT NULL,

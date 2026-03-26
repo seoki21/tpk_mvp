@@ -5,7 +5,7 @@
  * - 응답 인터셉터: response.data를 자동 언래핑
  * - 에러 인터셉터: 콘솔에 에러 로깅 후 reject
  */
-import axios from 'axios'
+import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -13,18 +13,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   }
-})
+});
 
 /* 응답 인터셉터 — response.data만 반환하여 호출부에서 편리하게 사용 */
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    console.error('[API Error]', error.response?.status, error.response?.data || error.message)
+    console.error('[API Error]', error.response?.status, error.response?.data || error.message);
     /* 서버 에러 응답에서 detail 메시지를 추출하여 error.detail에 설정 */
-    const detail = error.response?.data?.detail || error.message || '알 수 없는 오류'
-    error.detail = detail
-    return Promise.reject(error)
+    const detail = error.response?.data?.detail || error.message || '알 수 없는 오류';
+    error.detail = detail;
+    return Promise.reject(error);
   }
-)
+);
 
-export default api
+export default api;

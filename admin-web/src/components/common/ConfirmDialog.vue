@@ -4,10 +4,6 @@
   - 어두운 오버레이 위에 간단한 메시지와 확인/취소 버튼을 표시
 -->
 <script setup>
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 defineProps({
   /** 다이얼로그 표시 여부 */
   visible: {
@@ -19,34 +15,31 @@ defineProps({
     type: String,
     default: ''
   }
-})
+});
 
-const emit = defineEmits(['confirm', 'cancel'])
+const emit = defineEmits(['confirm', 'cancel']);
 </script>
 
 <template>
   <Teleport to="body">
-    <div
-      v-if="visible"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
-    >
-      <div class="bg-white rounded-lg shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="visible" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+      <div class="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
         <!-- 메시지 -->
-        <p class="text-center text-gray-700 mb-6">{{ message }}</p>
+        <p class="mb-6 text-center text-gray-700">{{ message }}</p>
 
         <!-- 버튼 영역 -->
         <div class="flex items-center justify-center gap-3">
           <button
-            class="px-6 py-2 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
             @click="emit('confirm')"
           >
-            {{ t('common.confirm') }}
+            확인
           </button>
           <button
-            class="px-6 py-2 bg-gray-200 hover:bg-gray-300 border border-gray-400 rounded text-sm"
+            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
             @click="emit('cancel')"
           >
-            {{ t('common.cancel') }}
+            취소
           </button>
         </div>
       </div>
