@@ -9,6 +9,19 @@ import * as examListApi from '@/api/examList';
 import { getFiles } from '@/api/examFile';
 import * as examQuestionApi from '@/api/examQuestion';
 
+/**
+ * JSON 문자열을 안전하게 파싱하여 객체로 반환
+ * 파싱 실패 시 null 반환
+ */
+function safeParseJson(jsonStr) {
+  if (!jsonStr) return null;
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
 export const useExamQuestionStore = defineStore('examQuestion', () => {
   /* ========== 상태 ========== */
 
@@ -58,26 +71,36 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
   const mergedItems = computed(() => {
     const items = [];
 
-    // 지시문을 먼저 매핑: ins_no 기준으로 정리
+    // 지시문 추가 (_parsed로 JSON 1회 파싱, no_list 첫 번호를 _sortKey로 사용)
     instructions.value.forEach((ins) => {
+      const parsed = safeParseJson(ins.ins_json);
+      const firstNo =
+        parsed && parsed.no_list && parsed.no_list.length ? parsed.no_list[0] : ins.ins_no;
       items.push({
         ...ins,
         _type: 'instruction',
-        _sortKey: ins.ins_no
+        _sortKey: firstNo,
+        _parsed: parsed
       });
     });
 
-    // 문제 추가
+    // 문제 추가 (_parsed로 JSON 1회 파싱)
     questions.value.forEach((q) => {
       items.push({
         ...q,
         _type: 'question',
-        _sortKey: q.question_no
+        _sortKey: q.question_no,
+        _parsed: safeParseJson(q.question_json)
       });
     });
 
-    // _sortKey 기준 정렬
-    items.sort((a, b) => a._sortKey - b._sortKey);
+    // 번호 오름차순 정렬, 같은 번호면 지시문이 문제보다 먼저
+    items.sort((a, b) => {
+      if (a._sortKey !== b._sortKey) return a._sortKey - b._sortKey;
+      if (a._type === 'instruction' && b._type !== 'instruction') return -1;
+      if (a._type !== 'instruction' && b._type === 'instruction') return 1;
+      return 0;
+    });
     return items;
   });
 
@@ -140,8 +163,7 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
 
   /**
    * 시험 선택 변경 처리
-   * - 파일 목록 로드
-   * - 문제/지시문 로드
+   * - 파일 목록만 로드 (문제/지시문은 파일 선택 시 조회)
    * @param {number} examKey - 시험키 PK
    */
   async function selectExam(examKey) {
@@ -152,7 +174,7 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
     instructions.value = [];
 
     if (examKey) {
-      await Promise.all([fetchFileOptions(examKey), fetchQuestionsAndInstructions(examKey)]);
+      await fetchFileOptions(examKey);
     }
   }
 

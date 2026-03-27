@@ -105,16 +105,41 @@ function handleCancel() {
 }
 
 /**
- * JSON 텍스트를 파싱하여 UI에 표시할 객체로 변환
- * 파싱 실패 시 null 반환
+ * JSON 문자열을 들여쓰기 포매팅 후 구문 강조 HTML로 변환
+ * 키(보라), 문자열 값(초록), 숫자(파랑), boolean/null(주황) 색상 적용
  */
-function parseJson(jsonStr) {
-  if (!jsonStr) return null;
+function highlightJson(jsonStr) {
+  if (!jsonStr) return '{}';
+  let pretty;
   try {
-    return JSON.parse(jsonStr);
+    pretty = JSON.stringify(JSON.parse(jsonStr), null, 2);
   } catch {
-    return null;
+    return jsonStr.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+  return pretty
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"([^"]+)"(?=\s*:)/g, '<span class="text-purple-600">"$1"</span>')
+    .replace(/:\s*"([^"]*)"/g, ': <span class="text-green-600">"$1"</span>')
+    .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-blue-600">$1</span>')
+    .replace(/:\s*(true|false|null)/g, ': <span class="text-orange-600">$1</span>');
+}
+
+/**
+ * 피드백 문자열 파싱
+ * "①:T_정답 설명" → { label: "①", isCorrect: true, text: "정답 설명" }
+ */
+function parseFeedback(fb) {
+  if (!fb || typeof fb !== 'string') return { label: '', isCorrect: false, text: fb || '' };
+  const colonIdx = fb.indexOf(':');
+  if (colonIdx === -1) return { label: '', isCorrect: false, text: fb };
+  const label = fb.substring(0, colonIdx);
+  const rest = fb.substring(colonIdx + 1);
+  const isCorrect = rest.startsWith('T');
+  const underscoreIdx = rest.indexOf('_');
+  const text = underscoreIdx !== -1 ? rest.substring(underscoreIdx + 1) : rest;
+  return { label, isCorrect, text };
 }
 
 /**
@@ -238,7 +263,13 @@ onMounted(() => {
           v-if="!store.loading && store.mergedItems.length === 0"
           class="flex h-40 items-center justify-center text-gray-400"
         >
-          {{ store.selectedExamKey ? '문제 데이터가 없습니다.' : '기출문제를 선택하세요.' }}
+          {{
+            !store.selectedExamKey
+              ? '기출문제를 선택하세요.'
+              : !store.selectedPdfKey
+                ? '파일을 선택하세요.'
+                : '문제 데이터가 없습니다.'
+          }}
         </div>
 
         <!-- 로딩 -->
@@ -249,22 +280,36 @@ onMounted(() => {
         <!-- 항목 목록 -->
         <div v-if="!store.loading && store.mergedItems.length > 0" class="divide-y divide-gray-200">
           <div v-for="(item, index) in store.mergedItems" :key="index" class="flex gap-4 p-4">
-            <!-- 좌측: JSON 텍스트 (40%, 세로 스크롤만) -->
+            <!-- 좌측: JSON 텍스트 (40%, 구문 강조) -->
             <div class="w-2/5 shrink-0">
               <pre
-                class="max-h-[300px] overflow-y-auto overflow-x-hidden rounded border border-gray-200 bg-gray-50 p-2 text-xs leading-relaxed text-gray-600"
-                >{{
-                  item._type === 'question' ? item.question_json || '{}' : item.ins_json || '{}'
-                }}</pre
-              >
+                class="max-h-[300px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all rounded border border-gray-200 bg-gray-50 p-2 text-xs leading-relaxed text-gray-600"
+                v-html="
+                  highlightJson(
+                    item._type === 'question' ? item.question_json || '{}' : item.ins_json || '{}'
+                  )
+                "
+              ></pre>
             </div>
 
-            <!-- 우측: UI 렌더링 (60%) -->
-            <div class="min-w-0 w-3/5">
-              <!-- 지시문 렌더링 -->
+            <!-- 우측: 시험지 UI (60%) -->
+            <div class="w-3/5 min-w-0">
+              <!-- ===== 지시문 ===== -->
               <template v-if="item._type === 'instruction'">
-                <div class="flex items-start justify-between">
-                  <h3 class="mb-2 text-base font-bold text-gray-800">지시문 {{ item.ins_no }}</h3>
+                <!-- 상단: 지시문 {no} [{no_list}] {score}점 + 저장 -->
+                <div class="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+                  <div class="flex items-baseline gap-2 text-sm">
+                    <span class="font-bold text-gray-800">지시문 {{ item.ins_no }}</span>
+                    <span
+                      v-if="item._parsed && item._parsed.no_list && item._parsed.no_list.length"
+                      class="text-gray-500"
+                    >
+                      [{{ item._parsed.no_list.join(', ') }}]
+                    </span>
+                    <span v-if="item._parsed && item._parsed.score" class="text-gray-500">
+                      {{ item._parsed.score }}점
+                    </span>
+                  </div>
                   <button
                     class="shrink-0 rounded border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100"
                     @click="handleSaveItem(item)"
@@ -272,39 +317,49 @@ onMounted(() => {
                     저장
                   </button>
                 </div>
-                <template v-if="parseJson(item.ins_json)">
-                  <p class="mb-1 text-sm text-gray-700">
-                    {{ parseJson(item.ins_json).full_sentence }}
+                <!-- 본문 -->
+                <template v-if="item._parsed">
+                  <p
+                    v-if="item._parsed.full_sentence"
+                    class="mb-2 text-sm leading-relaxed text-gray-800"
+                  >
+                    {{ item._parsed.full_sentence }}
                   </p>
                   <div
-                    v-if="parseJson(item.ins_json).paragraph"
-                    class="mt-2 rounded border border-gray-200 bg-white p-3 text-sm text-gray-600"
+                    v-if="item._parsed.paragraph"
+                    class="mt-2 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"
                   >
-                    <div class="mb-1 text-center text-xs text-gray-400">&lt;보기&gt;</div>
-                    {{ parseJson(item.ins_json).paragraph }}
+                    <p class="whitespace-pre-wrap">{{ item._parsed.paragraph }}</p>
                   </div>
                 </template>
                 <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>
               </template>
 
-              <!-- 문제 렌더링 -->
+              <!-- ===== 문항 ===== -->
               <template v-if="item._type === 'question'">
-                <div class="flex items-start justify-between">
-                  <h3 class="mb-2 text-base font-bold text-gray-800">
-                    문제 {{ item.question_no }}
-                    <span v-if="item.score" class="text-sm font-normal text-gray-500"
-                      >, {{ item.score }}점</span
+                <!-- 상단: {no}번 {section} {type} {score}점 + 저장 -->
+                <div class="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+                  <div class="flex items-baseline gap-2 text-sm">
+                    <span class="font-bold text-gray-800">{{ item.question_no }}번</span>
+                    <span
+                      v-if="item.section"
+                      class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700"
                     >
-                    <span v-if="item.section" class="text-sm font-normal text-gray-500"
-                      >, {{ item.section }}</span
+                      {{ item.section }}
+                    </span>
+                    <span
+                      v-if="item.question_type"
+                      class="rounded bg-green-50 px-1.5 py-0.5 text-green-700"
                     >
-                    <span v-if="item.question_type" class="text-sm font-normal text-gray-500"
-                      >, {{ item.question_type }}</span
+                      {{ item.question_type }}
+                    </span>
+                    <span
+                      v-if="item.score"
+                      class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700"
                     >
-                    <span v-if="item.difficulty" class="text-sm font-normal text-gray-500"
-                      >, 난이도 {{ item.difficulty }}</span
-                    >
-                  </h3>
+                      {{ item.score }}점
+                    </span>
+                  </div>
                   <button
                     class="shrink-0 rounded border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100"
                     @click="handleSaveItem(item)"
@@ -312,38 +367,66 @@ onMounted(() => {
                     저장
                   </button>
                 </div>
-                <template v-if="parseJson(item.question_json)">
-                  <div
-                    v-if="parseJson(item.question_json).full_sentence"
-                    class="mb-2 text-sm text-gray-600"
+                <!-- 본문 -->
+                <template v-if="item._parsed">
+                  <p
+                    v-if="item._parsed.full_sentence"
+                    class="mb-2 text-sm leading-relaxed text-gray-800"
                   >
-                    {{ parseJson(item.question_json).full_sentence }}
-                  </div>
+                    {{ item._parsed.full_sentence }}
+                  </p>
                   <div
-                    v-if="parseJson(item.question_json).paragraph"
-                    class="mb-2 rounded border border-gray-200 bg-white p-3 text-sm text-gray-600"
+                    v-if="item._parsed.paragraph"
+                    class="mb-3 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"
                   >
-                    <div class="mb-1 text-center text-xs text-gray-400">&lt;보기&gt;</div>
-                    {{ parseJson(item.question_json).paragraph }}
+                    <p class="whitespace-pre-wrap">{{ item._parsed.paragraph }}</p>
                   </div>
                   <p
-                    v-if="parseJson(item.question_json).question_text"
-                    class="mb-2 text-sm text-gray-700"
+                    v-if="item._parsed.question_text"
+                    class="mb-2 text-sm leading-relaxed text-gray-800"
                   >
-                    {{ parseJson(item.question_json).question_text }}
+                    {{ item.question_no }}. {{ item._parsed.question_text }}
                   </p>
                   <!-- 선택지 -->
                   <div
-                    v-if="parseJson(item.question_json).choices"
-                    class="mt-2 grid grid-cols-2 gap-2 text-sm"
+                    v-if="item._parsed.choices"
+                    class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
                   >
                     <span
-                      v-for="(choice, ci) in parseJson(item.question_json).choices"
+                      v-for="(choice, ci) in item._parsed.choices"
                       :key="ci"
                       class="text-gray-700"
                     >
                       {{ choice }}
                     </span>
+                  </div>
+                  <!-- 정답 / 해설 영역 -->
+                  <div
+                    v-if="item._parsed.correct_answer || (item._parsed.feedback && item._parsed.feedback.length)"
+                    class="mt-3 rounded bg-gray-50 px-3 py-2"
+                  >
+                    <p v-if="item._parsed.correct_answer" class="mb-1 text-xs text-gray-600">
+                      <span class="font-medium">정답:</span>
+                      <span class="ml-1 font-bold text-blue-700">
+                        {{ item._parsed.correct_answer }}번
+                      </span>
+                    </p>
+                    <div
+                      v-if="item._parsed.feedback && item._parsed.feedback.length"
+                      class="space-y-0.5"
+                    >
+                      <div
+                        v-for="(fb, fi) in item._parsed.feedback"
+                        :key="fi"
+                        class="text-xs"
+                        :class="
+                          parseFeedback(fb).isCorrect ? 'text-green-700' : 'text-gray-500'
+                        "
+                      >
+                        <span class="font-medium">{{ parseFeedback(fb).label }}</span>
+                        <span class="ml-1">{{ parseFeedback(fb).text }}</span>
+                      </div>
+                    </div>
                   </div>
                 </template>
                 <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>

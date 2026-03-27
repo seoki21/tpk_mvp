@@ -129,7 +129,12 @@ corepack pnpm run format      # Prettier 포매팅
     - 문제 목록(JSON → 화면), height는 콘텐츠 영역 100% 사용
     - 좌측(40%) JSON 텍스트 + 우측(60%) UI 렌더링 비율로 구성
     - JSON 텍스트는 tb_exam_question 테이블과 tb_exam_instruction 테이블의 데이터를 union all 하여 차례로 출력
-    - 메모 : 우측 영역에 UI를 그리는 방법은 추후 정의
+    - 정렬: 지시문의 `no_list` 첫 번호와 문제의 `question_no` 기준 오름차순. 같은 번호면 지시문이 문제보다 먼저 표시
+    - 좌측 JSON 영역: pretty-print + 구문 강조 (키=보라, 문자열=초록, 숫자=파랑, boolean=주황)
+    - 우측 시험지 UI 렌더링
+      - store `mergedItems`에서 `_parsed` 필드로 JSON 1회 파싱 (템플릿 내 반복 파싱 금지)
+      - 지시문: 상단 `지시문 {no} [{no_list}] {score}점`, 본문에 `full_sentence` + `paragraph` (보기 텍스트 없이 테두리 박스만)
+      - 문항: 상단 `{no}번 {section} {type} {score}점` (section/type/score 각각 다른 배경색 뱃지: 파랑/초록/노랑), 본문에 `full_sentence` + `paragraph` + `{no}. {question_text}` + 선택지(2열), 하단 별도 영역에 정답 번호 + 피드백 해설 표시
 - 기출문항 변환(JSON) 팝업
 
   * 구현 파일: `components/examQuestion/ExamConvertModal.vue`
