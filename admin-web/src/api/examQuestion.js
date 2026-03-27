@@ -23,6 +23,15 @@ export function bulkSave(examKey, data) {
 }
 
 /**
+ * 다국어 피드백 일괄 생성 (Claude API)
+ * 해당 시험의 모든 문제에 대해 feedback_json을 생성하여 DB에 저장한다.
+ * @param {number} examKey - 시험키 PK
+ */
+export function generateFeedback(examKey) {
+  return api.post(`/api/v1/exam-feedback/${examKey}/generate`);
+}
+
+/**
  * PDF → JSON 변환 (Claude API SSE 스트리밍)
  * fetch API를 사용하여 SSE 스트리밍 응답을 수신한다.
  * axios는 스트리밍을 네이티브 지원하지 않으므로 fetch + ReadableStream을 사용한다.

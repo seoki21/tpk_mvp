@@ -47,6 +47,12 @@ const router = createRouter({
           name: 'pastExamQuestions',
           component: () => import('../views/PastExamQuestionView.vue')
         },
+        /* 기출문항 변환(JSON) — 기출문제관리에서 진입 */
+        {
+          path: 'past-exam-questions/:examKey/:pdfKey/convert',
+          name: 'examConvert',
+          component: () => import('../views/ExamConvertView.vue')
+        },
         {
           path: 'practice-questions',
           name: 'practiceQuestions',

@@ -13,6 +13,7 @@ class ExamFileResponse(BaseModel):
     file_path: str = Field(..., description="서버 저장 경로")
     file_size: int | None = Field(None, description="파일 크기 (bytes)")
     sort_order: int = Field(0, description="정렬 순서")
+    file_type: str | None = Field(None, description="파일 유형 (pdf, json)")
     del_yn: str = Field("N", description="삭제여부")
     ins_date: str | None = Field(None, description="등록일시")
     ins_user: str | None = Field(None, description="등록자")

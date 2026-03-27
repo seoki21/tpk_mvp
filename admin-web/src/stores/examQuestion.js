@@ -84,13 +84,14 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
       });
     });
 
-    // 문제 추가 (_parsed로 JSON 1회 파싱)
+    // 문제 추가 (_parsed로 JSON 1회 파싱, _feedbackParsed로 feedback_json 파싱)
     questions.value.forEach((q) => {
       items.push({
         ...q,
         _type: 'question',
         _sortKey: q.question_no,
-        _parsed: safeParseJson(q.question_json)
+        _parsed: safeParseJson(q.question_json),
+        _feedbackParsed: safeParseJson(q.feedback_json)
       });
     });
 

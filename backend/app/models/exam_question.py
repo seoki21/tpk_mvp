@@ -13,6 +13,7 @@ class ExamQuestionSave(BaseModel):
     question_type: Optional[str] = Field(None, description="문제 유형")
     struct_type: Optional[str] = Field(None, description="구조 유형")
     question_json: Optional[str] = Field(None, description="문제 JSON 데이터")
+    feedback_json: Optional[str] = Field(None, description="피드백 JSON 데이터 (다국어 해설)")
     score: Optional[int] = Field(None, description="배점")
     difficulty: Optional[str] = Field(None, description="난이도")
 

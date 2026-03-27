@@ -17,12 +17,14 @@ export function getFiles(examKey) {
  * 파일 업로드 (여러 파일 동시 업로드 가능)
  * @param {number} examKey - 시험키 PK
  * @param {File[]} files - 업로드할 파일 배열
+ * @param {string} fileType - 파일 유형 ('pdf' | 'json', 기본값 'pdf')
  */
-export function uploadFiles(examKey, files) {
+export function uploadFiles(examKey, files, fileType = 'pdf') {
   const formData = new FormData();
   files.forEach((file) => {
     formData.append('files', file);
   });
+  formData.append('file_type', fileType);
   /* Content-Type을 명시하지 않아야 Axios가 boundary를 자동 생성한다 */
   return api.post(`/api/v1/exam-list/${examKey}/files`, formData, {
     headers: { 'Content-Type': undefined }

@@ -18,7 +18,9 @@ _BASE_SELECT = """
            tl.code_name AS tpk_level_name,
            sc.code_name AS section_name,
            (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
-              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N') AS has_file
+              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND (ef.file_type = 'pdf' OR ef.file_type IS NULL)) AS has_pdf,
+           (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
+              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'json') AS has_json
       FROM tb_exam_list e
       LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(e.exam_type AS INTEGER)
       LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.tpk_level AS INTEGER)

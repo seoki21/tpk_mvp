@@ -25,7 +25,7 @@ def list_questions_and_instructions(exam_key: int) -> dict:
         cursor.execute(
             """
             SELECT exam_key, question_no, section, question_type, struct_type,
-                   question_json, score, difficulty, del_yn,
+                   question_json, feedback_json, score, difficulty, del_yn,
                    TO_CHAR(ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, ins_user,
                    TO_CHAR(upd_date, 'YYYY-MM-DD HH24:MI:SS') AS upd_date, upd_user
               FROM tb_exam_question
@@ -83,35 +83,59 @@ def save_question(exam_key: int, data: dict, user: str = "admin") -> dict:
         exists = cursor.fetchone()
 
         if exists:
-            # UPDATE
-            cursor.execute(
-                """
-                UPDATE tb_exam_question
-                   SET section = %s, question_type = %s, struct_type = %s,
-                       question_json = %s, score = %s, difficulty = %s,
-                       del_yn = 'N', upd_date = NOW(), upd_user = %s
-                 WHERE exam_key = %s AND question_no = %s
-                """,
-                (
-                    data.get("section"),
-                    data.get("question_type"),
-                    data.get("struct_type"),
-                    data.get("question_json"),
-                    data.get("score"),
-                    data.get("difficulty"),
-                    user,
-                    exam_key,
-                    question_no,
-                ),
-            )
+            # UPDATE — feedback_json은 값이 전달된 경우에만 갱신 (기존 값 보존)
+            if "feedback_json" in data and data["feedback_json"] is not None:
+                cursor.execute(
+                    """
+                    UPDATE tb_exam_question
+                       SET section = %s, question_type = %s, struct_type = %s,
+                           question_json = %s, feedback_json = %s, score = %s, difficulty = %s,
+                           del_yn = 'N', upd_date = NOW(), upd_user = %s
+                     WHERE exam_key = %s AND question_no = %s
+                    """,
+                    (
+                        data.get("section"),
+                        data.get("question_type"),
+                        data.get("struct_type"),
+                        data.get("question_json"),
+                        data.get("feedback_json"),
+                        data.get("score"),
+                        data.get("difficulty"),
+                        user,
+                        exam_key,
+                        question_no,
+                    ),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE tb_exam_question
+                       SET section = %s, question_type = %s, struct_type = %s,
+                           question_json = %s, score = %s, difficulty = %s,
+                           del_yn = 'N', upd_date = NOW(), upd_user = %s
+                     WHERE exam_key = %s AND question_no = %s
+                    """,
+                    (
+                        data.get("section"),
+                        data.get("question_type"),
+                        data.get("struct_type"),
+                        data.get("question_json"),
+                        data.get("score"),
+                        data.get("difficulty"),
+                        user,
+                        exam_key,
+                        question_no,
+                    ),
+                )
         else:
             # INSERT
             cursor.execute(
                 """
                 INSERT INTO tb_exam_question
                        (exam_key, question_no, section, question_type, struct_type,
-                        question_json, score, difficulty, del_yn, ins_date, ins_user, upd_date, upd_user)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
+                        question_json, feedback_json, score, difficulty,
+                        del_yn, ins_date, ins_user, upd_date, upd_user)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
                 """,
                 (
                     exam_key,
@@ -120,6 +144,7 @@ def save_question(exam_key: int, data: dict, user: str = "admin") -> dict:
                     data.get("question_type"),
                     data.get("struct_type"),
                     data.get("question_json"),
+                    data.get("feedback_json"),
                     data.get("score"),
                     data.get("difficulty"),
                     user,
@@ -133,7 +158,7 @@ def save_question(exam_key: int, data: dict, user: str = "admin") -> dict:
         cursor.execute(
             """
             SELECT exam_key, question_no, section, question_type, struct_type,
-                   question_json, score, difficulty, del_yn,
+                   question_json, feedback_json, score, difficulty, del_yn,
                    TO_CHAR(ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, ins_user,
                    TO_CHAR(upd_date, 'YYYY-MM-DD HH24:MI:SS') AS upd_date, upd_user
               FROM tb_exam_question

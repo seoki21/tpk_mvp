@@ -53,17 +53,29 @@ const form = ref({
   del_yn: 'N'
 });
 
-/* ========== 파일 관련 상태 ========== */
-/** 서버에 업로드된 파일 목록 (수정 모드) */
+/* ========== PDF 파일 관련 상태 ========== */
+/** 서버에 업로드된 PDF 파일 목록 (수정 모드) */
 const fileList = ref([]);
-/** 등록 모드에서 대기 중인 파일 (저장 시 업로드) */
+/** 등록 모드에서 대기 중인 PDF 파일 (저장 시 업로드) */
 const pendingFiles = ref([]);
-/** 파일 업로드 로딩 상태 */
+/** PDF 파일 업로드 로딩 상태 */
 const fileLoading = ref(false);
-/** 파일 선택 input ref */
+/** PDF 파일 선택 input ref */
 const fileInput = ref(null);
-/** 드래그 중 여부 (시각적 피드백용) */
+/** PDF 드래그 중 여부 (시각적 피드백용) */
 const isDragging = ref(false);
+
+/* ========== JSON 파일 관련 상태 ========== */
+/** 서버에 업로드된 JSON 파일 목록 (수정 모드) */
+const jsonFileList = ref([]);
+/** 등록 모드에서 대기 중인 JSON 파일 (저장 시 업로드) */
+const pendingJsonFiles = ref([]);
+/** JSON 파일 업로드 로딩 상태 */
+const jsonFileLoading = ref(false);
+/** JSON 파일 선택 input ref */
+const jsonFileInput = ref(null);
+/** JSON 드래그 중 여부 */
+const isJsonDragging = ref(false);
 
 /** 모달이 열릴 때 폼 데이터를 초기화 */
 watch(
@@ -71,7 +83,9 @@ watch(
   async (newVal) => {
     if (newVal) {
       pendingFiles.value = [];
+      pendingJsonFiles.value = [];
       isDragging.value = false;
+      isJsonDragging.value = false;
 
       if (props.editData) {
         /* 수정 모드: 기존 데이터를 폼에 채움 */
@@ -84,7 +98,7 @@ watch(
           section: props.editData.section || '',
           del_yn: props.editData.del_yn || 'N'
         };
-        /* 수정 모드에서 파일 목록 로드 */
+        /* 수정 모드에서 파일 목록 로드 (PDF + JSON) */
         await loadFiles();
       } else {
         /* 등록 모드: 빈 폼으로 초기화 */
@@ -98,6 +112,7 @@ watch(
           del_yn: 'N'
         };
         fileList.value = [];
+        jsonFileList.value = [];
       }
 
       /* 코드 옵션이 비어 있으면 가져옴 */
@@ -110,15 +125,19 @@ watch(
 
 /* ========== 파일 함수 ========== */
 
-/** 서버에서 파일 목록을 조회한다 */
+/** 서버에서 파일 목록을 조회하고 file_type별로 분리한다 */
 async function loadFiles() {
   if (!form.value.exam_key) return;
   try {
     const res = await getFiles(form.value.exam_key);
-    fileList.value = res.data || [];
+    const allFiles = res.data || [];
+    /* file_type별 분리 (NULL이면 pdf로 취급) */
+    fileList.value = allFiles.filter((f) => !f.file_type || f.file_type === 'pdf');
+    jsonFileList.value = allFiles.filter((f) => f.file_type === 'json');
   } catch (error) {
     console.error('[FILE] 목록 조회 실패:', error);
     fileList.value = [];
+    jsonFileList.value = [];
   }
 }
 
@@ -132,9 +151,69 @@ function validatePdfFiles(files) {
   return true;
 }
 
-/** 파일 선택 버튼 클릭 */
+/** JSON 파일 유효성 검증 — 실패 시 false 반환 */
+function validateJsonFiles(files) {
+  const invalidFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.json'));
+  if (invalidFiles.length > 0) {
+    alert('JSON 파일 형식이 아닌 것 같으니 확인 바랍니다.');
+    return false;
+  }
+  return true;
+}
+
+/** PDF 파일 선택 버튼 클릭 */
 function triggerFileInput() {
   fileInput.value?.click();
+}
+
+/** JSON 파일 선택 버튼 클릭 */
+function triggerJsonFileInput() {
+  jsonFileInput.value?.click();
+}
+
+/** JSON 파일 선택 후 처리 */
+async function handleJsonFileChange(event) {
+  const files = Array.from(event.target.files || []);
+  if (files.length === 0) return;
+
+  if (!validateJsonFiles(files)) {
+    event.target.value = '';
+    return;
+  }
+
+  if (isEditMode.value) {
+    await doUpload(files, 'json');
+  } else {
+    pendingJsonFiles.value = [...pendingJsonFiles.value, ...files];
+  }
+  event.target.value = '';
+}
+
+/** JSON 드래그앤드롭 핸들러 */
+function onJsonDragOver() {
+  if (isPastExamType.value) isJsonDragging.value = true;
+}
+function onJsonDragLeave() {
+  isJsonDragging.value = false;
+}
+async function onJsonDrop(e) {
+  isJsonDragging.value = false;
+  if (!isPastExamType.value) return;
+
+  const files = Array.from(e.dataTransfer?.files || []);
+  if (files.length === 0) return;
+  if (!validateJsonFiles(files)) return;
+
+  if (isEditMode.value) {
+    await doUpload(files, 'json');
+  } else {
+    pendingJsonFiles.value = [...pendingJsonFiles.value, ...files];
+  }
+}
+
+/** 대기 JSON 파일 삭제 (등록 모드) */
+function removePendingJsonFile(index) {
+  pendingJsonFiles.value.splice(index, 1);
 }
 
 /** 파일 선택 후 처리 (input change) */
@@ -185,15 +264,16 @@ async function onDrop(e) {
 }
 
 /** 서버에 파일 업로드 실행 (수정 모드에서 사용) */
-async function doUpload(files) {
-  fileLoading.value = true;
+async function doUpload(files, fileType = 'pdf') {
+  const loadingRef = fileType === 'json' ? jsonFileLoading : fileLoading;
+  loadingRef.value = true;
   try {
-    await uploadFiles(form.value.exam_key, files);
+    await uploadFiles(form.value.exam_key, files, fileType);
     await loadFiles();
   } catch (error) {
     alert(error.detail || '오류가 발생했습니다');
   } finally {
-    fileLoading.value = false;
+    loadingRef.value = false;
   }
 }
 
@@ -256,15 +336,27 @@ async function handleSave() {
       examKey = result?.data?.exam_key;
     }
 
-    /* 등록 모드에서 pendingFiles가 있으면 업로드 */
+    /* 등록 모드에서 pendingFiles(PDF)가 있으면 업로드 */
     if (pendingFiles.value.length > 0 && examKey) {
       fileLoading.value = true;
       try {
-        await uploadFiles(examKey, pendingFiles.value);
+        await uploadFiles(examKey, pendingFiles.value, 'pdf');
       } catch (uploadError) {
-        alert(uploadError.detail || '파일 업로드 중 오류가 발생했습니다');
+        alert(uploadError.detail || 'PDF 파일 업로드 중 오류가 발생했습니다');
       } finally {
         fileLoading.value = false;
+      }
+    }
+
+    /* 등록 모드에서 pendingJsonFiles(JSON)가 있으면 업로드 */
+    if (pendingJsonFiles.value.length > 0 && examKey) {
+      jsonFileLoading.value = true;
+      try {
+        await uploadFiles(examKey, pendingJsonFiles.value, 'json');
+      } catch (uploadError) {
+        alert(uploadError.detail || 'JSON 파일 업로드 중 오류가 발생했습니다');
+      } finally {
+        jsonFileLoading.value = false;
       }
     }
 
@@ -395,10 +487,10 @@ function cancelDelete() {
         </select>
       </div>
 
-      <!-- ========== 기출문제(PDF) 파일 영역 ========== -->
+      <!-- ========== 문제(PDF) 파일 영역 ========== -->
       <div class="border-t border-gray-200 pt-4">
         <div class="mb-3 flex items-center justify-between">
-          <label class="text-sm font-medium text-gray-700">기출문제(PDF)</label>
+          <label class="text-sm font-medium text-gray-700">문제(PDF)</label>
           <button
             type="button"
             class="rounded px-3 py-1.5 text-xs text-white"
@@ -423,7 +515,7 @@ function cancelDelete() {
 
         <!-- 드래그앤드롭 영역 -->
         <div
-          class="flex min-h-[120px] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors"
+          class="flex min-h-[100px] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors"
           :class="
             !isPastExamType
               ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
@@ -502,6 +594,121 @@ function cancelDelete() {
             </p>
             <p v-else class="text-sm">
               PDF 파일을 이곳에 드래그하거나, 파일 선택 버튼을 클릭하세요.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 문제(JSON) 파일 영역 ========== -->
+      <div class="border-t border-gray-200 pt-4">
+        <div class="mb-3 flex items-center justify-between">
+          <label class="text-sm font-medium text-gray-700">문제(JSON)</label>
+          <button
+            type="button"
+            class="rounded px-3 py-1.5 text-xs text-white"
+            :class="
+              isPastExamType ? 'bg-teal-500 hover:bg-teal-600' : 'cursor-not-allowed bg-gray-300'
+            "
+            :disabled="!isPastExamType || jsonFileLoading"
+            @click="triggerJsonFileInput"
+          >
+            {{ jsonFileLoading ? '업로드 중...' : '파일 선택' }}
+          </button>
+          <input
+            ref="jsonFileInput"
+            type="file"
+            multiple
+            accept=".json"
+            class="hidden"
+            @change="handleJsonFileChange"
+          />
+        </div>
+
+        <!-- 드래그앤드롭 영역 -->
+        <div
+          class="flex min-h-[100px] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors"
+          :class="
+            !isPastExamType
+              ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
+              : isJsonDragging
+                ? 'border-teal-400 bg-teal-50 text-teal-500'
+                : 'border-gray-300 bg-white text-gray-400'
+          "
+          @dragenter.prevent
+          @dragover.prevent="onJsonDragOver"
+          @dragleave.prevent="onJsonDragLeave"
+          @drop.prevent="onJsonDrop"
+        >
+          <!-- 업로드된 JSON 파일 목록 (수정 모드) -->
+          <div v-if="isEditMode && jsonFileList.length > 0" class="w-full space-y-2 text-left">
+            <div
+              v-for="file in jsonFileList"
+              :key="file.pdf_key"
+              class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2"
+            >
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <span class="text-xs font-semibold text-teal-600">JSON</span>
+                <a
+                  :href="getFileDownloadUrl(file)"
+                  class="truncate text-sm text-blue-600 hover:underline"
+                  target="_blank"
+                >
+                  {{ file.file_name }}
+                </a>
+                <span class="shrink-0 text-xs text-gray-400">
+                  {{ formatFileSize(file.file_size) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="ml-2 shrink-0 text-sm text-red-500 hover:text-red-700"
+                @click="handleFileDelete(file)"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+
+          <!-- 대기 JSON 파일 목록 (등록 모드) -->
+          <div
+            v-if="!isEditMode && pendingJsonFiles.length > 0"
+            class="w-full space-y-2 text-left"
+          >
+            <div
+              v-for="(file, idx) in pendingJsonFiles"
+              :key="idx"
+              class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2"
+            >
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <span class="text-xs font-semibold text-teal-600">JSON</span>
+                <span class="truncate text-sm text-gray-700">{{ file.name }}</span>
+                <span class="shrink-0 text-xs text-gray-400">
+                  {{ formatFileSize(file.size) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="ml-2 shrink-0 text-sm text-red-500 hover:text-red-700"
+                @click="removePendingJsonFile(idx)"
+              >
+                제거
+              </button>
+            </div>
+          </div>
+
+          <!-- 안내 문구 (파일이 없을 때) -->
+          <div
+            v-if="
+              (isEditMode && jsonFileList.length === 0) ||
+              (!isEditMode && pendingJsonFiles.length === 0)
+            "
+            class="py-4"
+          >
+            <p v-if="!isPastExamType" class="text-sm">
+              시험유형을 '기출문제'로 선택하면 JSON 업로드가 활성화됩니다.
+            </p>
+            <p v-else class="text-sm">
+              JSON 파일을 이곳에 드래그하거나, 파일 선택 버튼을 클릭하세요.
             </p>
           </div>
         </div>

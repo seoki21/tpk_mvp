@@ -25,7 +25,8 @@ const columns = [
   { key: 'tpk_level_name', label: '토픽레벨', width: '140px', align: 'left' },
   { key: 'round', label: '회차', width: '80px' },
   { key: 'section_name', label: '영역', width: '140px', align: 'left' },
-  { key: 'has_file', label: '파일', width: '60px', sortable: false },
+  { key: 'has_pdf', label: '문제(PDF)', width: '80px', sortable: false },
+  { key: 'has_json', label: '문제(JSON)', width: '80px', sortable: false },
   { key: 'del_yn', label: '삭제여부', width: '100px' },
   { key: 'ins_user', label: '생성자', width: '120px' },
   { key: 'ins_date', label: '생성시간', width: '180px' }
@@ -185,14 +186,36 @@ onMounted(() => {
       @row-click="handleRowClick"
       @update:page-size="handlePageSizeChange"
     >
-      <!-- 파일 컬럼 커스텀 렌더링: Y이면 파일 아이콘, 아니면 공백 -->
-      <template #cell-has_file="{ row, value }">
+      <!-- 문제(PDF) 컬럼: Y이면 파일 아이콘, 아니면 공백 -->
+      <template #cell-has_pdf="{ row, value }">
         <span
           v-if="value === 'Y'"
           class="cursor-pointer text-blue-600 hover:text-blue-800"
-          title="파일 보기"
+          title="PDF 파일 보기"
           @click.stop="handleFileClick(row, $event)"
         >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="mx-auto h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+        </span>
+        <span v-else></span>
+      </template>
+
+      <!-- 문제(JSON) 컬럼: Y이면 파일 아이콘, 아니면 공백 -->
+      <template #cell-has_json="{ value }">
+        <span v-if="value === 'Y'" class="text-teal-600" title="JSON 파일 있음">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="mx-auto h-5 w-5"

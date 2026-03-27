@@ -46,7 +46,7 @@ def list_files(exam_key: int) -> list[dict]:
         cursor.execute(
             """
             SELECT pdf_key, exam_key, file_name, file_path, file_size, sort_order,
-                   del_yn,
+                   file_type, del_yn,
                    TO_CHAR(ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, ins_user
               FROM tb_exam_file
              WHERE exam_key = %s AND del_yn = 'N'
@@ -60,7 +60,7 @@ def list_files(exam_key: int) -> list[dict]:
 
 
 async def upload_files(
-    exam_key: int, files: list[UploadFile], user: str = "admin"
+    exam_key: int, files: list[UploadFile], file_type: str = "pdf", user: str = "admin"
 ) -> list[dict]:
     """
     파일을 서버에 저장하고 DB에 메타데이터를 등록한다.
@@ -69,6 +69,7 @@ async def upload_files(
     Args:
         exam_key: 시험 PK
         files: 업로드된 파일 리스트
+        file_type: 파일 유형 (pdf, json)
         user: 등록자
 
     Returns:
@@ -108,12 +109,12 @@ async def upload_files(
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            # 파일 메타데이터 INSERT
+            # 파일 메타데이터 INSERT (file_type 포함)
             cursor.execute(
                 """
                 INSERT INTO tb_exam_file (exam_key, file_name, file_path, file_size, sort_order,
-                                          del_yn, ins_date, ins_user)
-                VALUES (%s, %s, %s, %s, %s, 'N', NOW(), %s)
+                                          file_type, del_yn, ins_date, ins_user)
+                VALUES (%s, %s, %s, %s, %s, %s, 'N', NOW(), %s)
                 RETURNING pdf_key
                 """,
                 (
@@ -122,6 +123,7 @@ async def upload_files(
                     relative_path,
                     file_size,
                     current_max + idx + 1,
+                    file_type,
                     user,
                 ),
             )
@@ -159,7 +161,7 @@ def delete_file(pdf_key: int, user: str = "admin") -> Optional[dict]:
         cursor.execute(
             """
             SELECT pdf_key, exam_key, file_name, file_path, file_size, sort_order,
-                   del_yn,
+                   file_type, del_yn,
                    TO_CHAR(ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, ins_user
               FROM tb_exam_file
              WHERE pdf_key = %s
@@ -206,7 +208,7 @@ def get_file(pdf_key: int) -> Optional[dict]:
         cursor.execute(
             """
             SELECT pdf_key, exam_key, file_name, file_path, file_size, sort_order,
-                   del_yn,
+                   file_type, del_yn,
                    TO_CHAR(ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, ins_user
               FROM tb_exam_file
              WHERE pdf_key = %s AND del_yn = 'N'
