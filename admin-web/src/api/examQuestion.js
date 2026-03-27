@@ -23,12 +23,51 @@ export function bulkSave(examKey, data) {
 }
 
 /**
- * 다국어 피드백 일괄 생성 (Claude API)
+ * 다국어 피드백 일괄 생성 (AI API)
  * 해당 시험의 모든 문제에 대해 feedback_json을 생성하여 DB에 저장한다.
  * @param {number} examKey - 시험키 PK
+ * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
  */
-export function generateFeedback(examKey) {
-  return api.post(`/api/v1/exam-feedback/${examKey}/generate`);
+export function generateFeedback(examKey, aiProvider = 'claude') {
+  return api.post(`/api/v1/exam-feedback/${examKey}/generate`, { ai_provider: aiProvider });
+}
+
+/**
+ * 단건 피드백 생성 (AI API)
+ * question_json을 전달하여 다국어 피드백을 생성한다. DB 저장 없이 결과만 반환.
+ * @param {string} questionJson - 문제 JSON 문자열
+ * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
+ */
+export function generateFeedbackSingle(questionJson, aiProvider = 'claude') {
+  return api.post('/api/v1/exam-feedback/generate-single', { question_json: questionJson, ai_provider: aiProvider }, { timeout: 20000 });
+}
+
+/**
+ * 단건 피드백 저장
+ * 특정 문항의 feedback_json을 DB에 저장한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {number} questionNo - 문제 번호
+ * @param {string} feedbackJson - 피드백 JSON 문자열
+ */
+export function saveFeedbackSingle(examKey, questionNo, feedbackJson) {
+  return api.post(`/api/v1/exam-feedback/${examKey}/save-single`, { question_no: questionNo, feedback_json: feedbackJson });
+}
+
+/**
+ * 단건 문제+피드백 저장
+ * 특정 문항의 question_json과 feedback_json을 DB에 업데이트한다.
+ * 기존 row가 없으면 에러 반환 (전체 저장 후 수정만 가능).
+ * @param {number} examKey - 시험키 PK
+ * @param {number} questionNo - 문제 번호
+ * @param {string|null} questionJson - 문제 JSON 문자열
+ * @param {string|null} feedbackJson - 피드백 JSON 문자열
+ */
+export function updateQuestionSingle(examKey, questionNo, questionJson, feedbackJson) {
+  return api.post(`/api/v1/exam-feedback/${examKey}/update-single`, {
+    question_no: questionNo,
+    question_json: questionJson,
+    feedback_json: feedbackJson,
+  });
 }
 
 /**
@@ -41,15 +80,16 @@ export function generateFeedback(examKey) {
  * @param {Function} onEvent - SSE 이벤트 콜백 ({ type, data })
  *   - type: 'start' | 'text_delta' | 'done' | 'error'
  *   - data: 이벤트별 데이터 객체
+ * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
  */
-export async function convertPdfToJsonStream(examKey, pdfKey, onEvent) {
+export async function convertPdfToJsonStream(examKey, pdfKey, onEvent, aiProvider = 'claude') {
   /* API base URL — 개발 환경에서는 빈 문자열(Vite 프록시 사용) */
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
 
   const response = await fetch(`${baseUrl}/api/v1/exam-list/${examKey}/convert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdf_key: pdfKey })
+    body: JSON.stringify({ pdf_key: pdfKey, ai_provider: aiProvider })
   });
 
   /* HTTP 에러 응답 처리 (스트리밍 시작 전 에러) */

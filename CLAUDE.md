@@ -89,11 +89,14 @@ corepack pnpm run format      # 코드 포매팅
   - 시험문제(기출 및 모의)
   - 연습문제
 
-## AI 연동
+## AI 연동 (멀티 프로바이더)
 
-- **Claude API** (Anthropic): `anthropic` Python SDK 사용 (`AsyncAnthropic` 비동기 클라이언트)
-- 기출문항 PDF → JSON 변환: PDF를 Claude API로 분석하여 문제/지시문 JSON 생성
+- **Claude API** (Anthropic): `anthropic` Python SDK (`AsyncAnthropic` 비동기 클라이언트)
+- **Gemini API** (Google): `google-genai` Python SDK
+- 프론트엔드에서 AI 제공자(Claude/Gemini) 선택 UI 제공 (`ai_provider` 파라미터)
+- 기출문항 PDF → JSON 변환: PDF를 AI API로 분석하여 문제/지시문 JSON 생성
   - SSE(Server-Sent Events) 스트리밍으로 실시간 결과 전달
   - `max_tokens: 64000`, 프론트엔드 타임아웃: 300초
-- AI 피드백: 학습 문제에 대한 AI 기반 피드백 생성
-- 환경변수: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (`backend/.env`)
+- AI 피드백: 학습 문제에 대한 AI 기반 다국어 피드백 생성
+- 프롬프트 외부 파일 관리: `backend/app/prompts/` 디렉토리, `.replace()` 방식으로 변수 치환
+- 환경변수: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `GOOGLE_AI_API_KEY`, `GOOGLE_AI_MODEL` (`backend/.env`)

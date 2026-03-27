@@ -39,6 +39,7 @@ async def convert_pdf_to_json(exam_key: int, body: PdfConvertRequest):
             async for event in convert_service.convert_pdf_to_json_stream(
                 exam_key=exam_key,
                 pdf_key=body.pdf_key,
+                ai_provider=body.ai_provider,
             ):
                 yield event
         except ValueError as e:

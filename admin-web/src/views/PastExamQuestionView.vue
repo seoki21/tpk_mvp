@@ -8,7 +8,7 @@
 import { onMounted, ref, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
-import { bulkSave, generateFeedback } from '@/api/examQuestion';
+import { bulkSave, generateFeedback, generateFeedbackSingle, updateQuestionSingle } from '@/api/examQuestion';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const router = useRouter();
@@ -60,7 +60,15 @@ function getEditState(item) {
   const key = itemKey(item);
   if (!editStates.has(key)) {
     const raw = item._type === 'question' ? item.question_json : item.ins_json;
-    editStates.set(key, { text: prettyPrint(raw), parsed: item._parsed, error: false });
+    const state = { text: prettyPrint(raw), parsed: item._parsed, error: false };
+    /* 문제 항목은 피드백 편집 상태도 관리 */
+    if (item._type === 'question') {
+      state.feedbackText = prettyPrint(item.feedback_json);
+      state.feedbackParsed = item._feedbackParsed;
+      state.feedbackError = false;
+      state.activeTab = 'question';
+    }
+    editStates.set(key, state);
   }
   return editStates.get(key);
 }
@@ -75,7 +83,14 @@ watch(
     items.forEach((item) => {
       const key = itemKey(item);
       const raw = item._type === 'question' ? item.question_json : item.ins_json;
-      editStates.set(key, { text: prettyPrint(raw), parsed: item._parsed, error: false });
+      const state = { text: prettyPrint(raw), parsed: item._parsed, error: false };
+      if (item._type === 'question') {
+        state.feedbackText = prettyPrint(item.feedback_json);
+        state.feedbackParsed = item._feedbackParsed;
+        state.feedbackError = false;
+        state.activeTab = 'question';
+      }
+      editStates.set(key, state);
     });
   }
 );
@@ -86,13 +101,44 @@ watch(
  */
 function handleJsonEdit(item, event) {
   const state = getEditState(item);
-  state.text = event.target.value;
-  try {
-    state.parsed = JSON.parse(state.text);
-    state.error = false;
-  } catch {
-    state.error = true;
+  const isFeedbackTab = item._type === 'question' && state.activeTab === 'feedback';
+
+  if (isFeedbackTab) {
+    state.feedbackText = event.target.value;
+    try {
+      state.feedbackParsed = JSON.parse(state.feedbackText);
+      state.feedbackError = false;
+    } catch {
+      state.feedbackError = true;
+    }
+  } else {
+    state.text = event.target.value;
+    try {
+      state.parsed = JSON.parse(state.text);
+      state.error = false;
+    } catch {
+      state.error = true;
+    }
   }
+}
+
+/** 좌측 JSON 탭 전환 (문제 항목 전용) */
+function setJsonTab(item, tab) {
+  getEditState(item).activeTab = tab;
+}
+
+/** 현재 활성 탭에 해당하는 JSON 텍스트 반환 */
+function getActiveJsonText(item) {
+  const state = getEditState(item);
+  if (item._type === 'question' && state.activeTab === 'feedback') return state.feedbackText;
+  return state.text;
+}
+
+/** 현재 활성 탭의 에러 상태 반환 */
+function getActiveJsonError(item) {
+  const state = getEditState(item);
+  if (item._type === 'question' && state.activeTab === 'feedback') return state.feedbackError;
+  return state.error;
 }
 
 /**
@@ -153,52 +199,69 @@ function handleJsonUploadSelect(event) {
 }
 
 /**
- * 개별 문제/지시문 저장 버튼
- * 편집된 JSON 텍스트를 기반으로 단건 저장
+ * 전체 문제/지시문 일괄 저장
+ * 모든 항목의 편집된 JSON 텍스트를 검증 후 일괄 저장한다.
  */
-async function handleSaveItem(item) {
-  if (!store.selectedExamKey) return;
+async function handleSaveAll() {
+  if (!store.selectedExamKey || store.mergedItems.length === 0) return;
 
-  /* 편집된 JSON 유효성 검증 */
-  const state = getEditState(item);
-  if (state.error) {
-    alert('JSON 형식이 올바르지 않습니다. 수정 후 다시 시도하세요.');
-    return;
+  const payload = { questions: [], instructions: [] };
+
+  /* 모든 항목의 JSON 유효성 검증 및 payload 구성 */
+  for (const item of store.mergedItems) {
+    const state = getEditState(item);
+
+    /* JSON 유효성 검증 */
+    if (state.error || (item._type === 'question' && state.feedbackError)) {
+      const label =
+        item._type === 'question' ? `${item.question_no}번 문제` : `지시문 ${item.ins_no}`;
+      alert(`${label}의 JSON 형식이 올바르지 않습니다. 수정 후 다시 시도하세요.`);
+      return;
+    }
+
+    /* 편집된 텍스트를 minify하여 저장용 JSON 문자열로 변환 */
+    let jsonForSave;
+    try {
+      jsonForSave = JSON.stringify(JSON.parse(state.text));
+    } catch {
+      const label =
+        item._type === 'question' ? `${item.question_no}번 문제` : `지시문 ${item.ins_no}`;
+      alert(`${label}의 JSON 형식이 올바르지 않습니다.`);
+      return;
+    }
+
+    if (item._type === 'question') {
+      const parsed = state.parsed || {};
+      const questionData = {
+        question_no: item.question_no,
+        section: parsed.section || item.section,
+        question_type: parsed.type || item.question_type,
+        struct_type: item.struct_type,
+        question_json: jsonForSave,
+        score: parsed.score || item.score,
+        difficulty: item.difficulty
+      };
+      /* feedback_json이 있으면 함께 저장 */
+      if (state.feedbackText && state.feedbackText.trim() !== '{}') {
+        try {
+          questionData.feedback_json = JSON.stringify(JSON.parse(state.feedbackText));
+        } catch {
+          alert(`${item.question_no}번 문제의 피드백 JSON 형식이 올바르지 않습니다.`);
+          return;
+        }
+      }
+      payload.questions.push(questionData);
+    } else {
+      payload.instructions.push({
+        ins_no: item.ins_no,
+        ins_json: jsonForSave
+      });
+    }
   }
 
-  /* 편집된 텍스트를 minify하여 저장용 JSON 문자열로 변환 */
-  let jsonForSave;
-  try {
-    jsonForSave = JSON.stringify(JSON.parse(state.text));
-  } catch {
-    alert('JSON 형식이 올바르지 않습니다.');
-    return;
-  }
-
-  confirmMessage.value = '저장하시겠습니까?';
+  confirmMessage.value = '전체 저장하시겠습니까?';
   confirmCallback.value = async () => {
     try {
-      const payload = { questions: [], instructions: [] };
-
-      if (item._type === 'question') {
-        /* 편집된 JSON에서 section, type, score 등도 반영 */
-        const parsed = state.parsed || {};
-        payload.questions.push({
-          question_no: item.question_no,
-          section: parsed.section || item.section,
-          question_type: parsed.type || item.question_type,
-          struct_type: item.struct_type,
-          question_json: jsonForSave,
-          score: parsed.score || item.score,
-          difficulty: item.difficulty
-        });
-      } else {
-        payload.instructions.push({
-          ins_no: item.ins_no,
-          ins_json: jsonForSave
-        });
-      }
-
       await bulkSave(store.selectedExamKey, payload);
       alert('저장되었습니다.');
       await store.fetchQuestionsAndInstructions(store.selectedExamKey);
@@ -287,7 +350,9 @@ function getFeedbackData(item) {
     { key: 'zh', label: '中文' },
     { key: 'vi', label: 'Tiếng Việt' }
   ];
-  const fbParsed = item._feedbackParsed;
+  /* 편집 상태의 feedbackParsed 우선, 없으면 store 원본 사용 */
+  const state = getEditState(item);
+  const fbParsed = state.feedbackParsed || item._feedbackParsed;
 
   if (fbParsed) {
     /*
@@ -376,7 +441,7 @@ async function handleGenerateFeedback() {
     return;
   }
 
-  confirmMessage.value = '모든 문제에 대해 다국어 피드백을 생성하시겠습니까?\n\n(주의:Claude API를 호출하므로 시간도 오래 걸리고 Token 사용이 많을 수도 있습니다)';
+  confirmMessage.value = `모든 문제에 대해 다국어 피드백을 생성하시겠습니까?\n\n(주의: Claude API를 호출하므로 시간도 오래 걸리고 Token 사용이 많을 수도 있습니다)`;
   confirmCallback.value = async () => {
     feedbackGenerating.value = true;
     try {
@@ -390,6 +455,95 @@ async function handleGenerateFeedback() {
       alert(error.detail || '피드백 생성에 실패했습니다.');
     } finally {
       feedbackGenerating.value = false;
+    }
+  };
+  showConfirm.value = true;
+}
+
+/**
+ * 개별 문항 피드백 생성 버튼 클릭 핸들러
+ * 해당 문항의 question_json을 기반으로 피드백을 생성한다.
+ * (현재는 전체 일괄 생성 API를 호출 — 추후 단건 API로 변경 가능)
+ */
+async function handleGenerateFeedbackForItem(item) {
+  if (!store.selectedExamKey) return;
+
+  confirmMessage.value = `피드백을 생성하시겠습니까? Claude API를 사용합니다`;
+  confirmCallback.value = async () => {
+    feedbackGenerating.value = true;
+    try {
+      /* 좌측 문제 탭의 JSON 텍스트를 API에 전달 */
+      const state = getEditState(item);
+      const questionJson = JSON.stringify(JSON.parse(state.text));
+      const res = await generateFeedbackSingle(questionJson);
+      const feedbackJson = res.data?.feedback_json;
+
+      if (feedbackJson) {
+        /* 편집 상태에 반영 (DB 저장 안 함 — 사용자가 별도 '저장' 클릭) */
+        const parsed = JSON.parse(feedbackJson);
+        state.feedbackText = JSON.stringify(parsed, null, 2);
+        state.feedbackParsed = parsed;
+        state.feedbackError = false;
+        /* 피드백 탭으로 전환하여 결과 즉시 확인 */
+        state.activeTab = 'feedback';
+      }
+    } catch (error) {
+      alert(error.detail || '피드백 생성에 실패했습니다.');
+    } finally {
+      feedbackGenerating.value = false;
+    }
+  };
+  showConfirm.value = true;
+}
+
+/** 단건 저장 상태 */
+const itemSaving = ref(false);
+
+/**
+ * 개별 문항 저장 버튼 클릭 핸들러
+ * 문제 탭의 question_json과 피드백 탭의 feedback_json을 모두 DB에 업데이트한다.
+ * 기존 row가 없으면 '전체 저장' 후 수정만 가능하다고 안내한다.
+ */
+async function handleSaveItemSingle(item) {
+  if (!store.selectedExamKey) return;
+
+  const state = getEditState(item);
+  const questionNo = item.question_no;
+
+  /* 문제 JSON 유효성 검증 */
+  let questionMinified = null;
+  if (state.text && state.text.trim()) {
+    try {
+      questionMinified = JSON.stringify(JSON.parse(state.text));
+    } catch {
+      alert('문제 JSON 형식이 올바르지 않습니다.');
+      return;
+    }
+  }
+
+  /* 피드백 JSON 유효성 검증 */
+  let feedbackMinified = null;
+  if (state.feedbackText && state.feedbackText.trim()) {
+    try {
+      feedbackMinified = JSON.stringify(JSON.parse(state.feedbackText));
+    } catch {
+      alert('피드백 JSON 형식이 올바르지 않습니다.');
+      return;
+    }
+  }
+
+  confirmMessage.value = `${questionNo}번 문제를 저장하시겠습니까?`;
+  confirmCallback.value = async () => {
+    itemSaving.value = true;
+    try {
+      await updateQuestionSingle(
+        store.selectedExamKey, questionNo, questionMinified, feedbackMinified
+      );
+      alert('저장되었습니다.');
+    } catch (error) {
+      alert(error.detail || '저장에 실패했습니다.');
+    } finally {
+      itemSaving.value = false;
     }
   };
   showConfirm.value = true;
@@ -454,22 +608,28 @@ onMounted(() => {
           </option>
         </select>
 
-        <!-- JSON 변환 버튼 — 클릭 시 JSON 변환 팝업 -->
+        <!-- 전체 변환(API) 화면 버튼 — 페이지 이동이므로 링크 스타일 + 화살표 아이콘 -->
         <button
-          class="rounded border border-blue-400 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1 rounded border border-blue-400 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!store.selectedPdfKey"
           @click="handleConvertClick"
         >
-          JSON 변환(일괄)
+          전체 변환(API) 화면
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
         </button>
 
-        <!-- JSON 변환(업로드) 버튼 — 파일 선택 후 업로드 처리 (추후 구현) -->
+        <!-- 가로 구분자 -->
+        <div class="h-6 w-px bg-gray-300"></div>
+
+        <!-- 전체 변환(파일 업로드) 버튼 -->
         <button
-          class="rounded border border-teal-400 bg-teal-50 px-3 py-1.5 text-sm text-teal-700 hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!store.selectedExamKey"
           @click="$refs.jsonUploadInput.click()"
         >
-          JSON 변환(업로드)
+          전체 변환(파일 업로드)
         </button>
         <input
           ref="jsonUploadInput"
@@ -479,14 +639,15 @@ onMounted(() => {
           @change="handleJsonUploadSelect"
         />
 
-        <!-- 피드백 생성 버튼 -->
+        <!-- 전체 저장 버튼 -->
         <button
-          class="rounded border border-purple-400 bg-purple-50 px-3 py-1.5 text-sm text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!store.selectedExamKey || feedbackGenerating || store.mergedItems.length === 0"
-          @click="handleGenerateFeedback"
+          class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!store.selectedExamKey || store.mergedItems.length === 0"
+          @click="handleSaveAll"
         >
-          {{ feedbackGenerating ? '피드백 생성 중...' : '피드백 생성' }}
+          전체 저장
         </button>
+
       </div>
     </div>
 
@@ -497,12 +658,6 @@ onMounted(() => {
           <span class="text-sm font-medium text-gray-700">문제 목록</span>
           <span class="ml-2 text-xs text-gray-400">※ JSON 데이터를 수정하면 우측 화면에서 실시간으로 결과를 확인할 수 있습니다</span>
         </div>
-        <button
-          class="rounded border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!store.selectedExamKey || store.mergedItems.length === 0"
-        >
-          모두 저장
-        </button>
       </div>
 
       <!-- 스크롤 영역 — 부모 flex-1로 남은 높이 전체 사용 -->
@@ -531,19 +686,62 @@ onMounted(() => {
           <div v-for="(item, index) in store.mergedItems" :key="index" class="flex gap-4 p-4">
             <!-- 좌측: JSON 편집 영역 (40%, 오버레이 구문 강조, 우측과 같은 높이) -->
             <div class="flex w-2/5 shrink-0 flex-col">
+              <!-- 탭바 (문제 항목만 — 문제/피드백 전환) -->
+              <div
+                v-if="item._type === 'question'"
+                class="mb-1 flex items-center gap-1 border-b border-gray-200 pb-1"
+              >
+                <button
+                  class="rounded-t px-2.5 py-1 text-xs transition-colors"
+                  :class="
+                    getEditState(item).activeTab === 'question'
+                      ? 'border-b-2 border-blue-500 font-medium text-blue-700'
+                      : 'text-gray-400 hover:text-gray-600'
+                  "
+                  @click="setJsonTab(item, 'question')"
+                >
+                  문제
+                </button>
+                <button
+                  class="rounded-t px-2.5 py-1 text-xs transition-colors"
+                  :class="
+                    getEditState(item).activeTab === 'feedback'
+                      ? 'border-b-2 border-blue-500 font-medium text-blue-700'
+                      : 'text-gray-400 hover:text-gray-600'
+                  "
+                  @click="setJsonTab(item, 'feedback')"
+                >
+                  피드백
+                </button>
+                <button
+                  class="ml-auto rounded border border-purple-300 bg-purple-50 px-2 py-0.5 text-[11px] text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="feedbackGenerating"
+                  @click="handleGenerateFeedbackForItem(item)"
+                >
+                  {{ feedbackGenerating ? '생성 중...' : '피드백 생성(API)' }}
+                </button>
+                <button
+                  class="rounded border border-gray-300 bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="itemSaving"
+                  @click="handleSaveItemSingle(item)"
+                >
+                  {{ itemSaving ? '저장 중...' : '저장' }}
+                </button>
+              </div>
+              <!-- JSON 편집기 -->
               <div
                 class="relative min-h-[80px] flex-1 overflow-hidden rounded border bg-gray-50"
-                :class="getEditState(item).error ? 'border-red-400' : 'border-gray-200'"
+                :class="getActiveJsonError(item) ? 'border-red-400' : 'border-gray-200'"
               >
                 <!-- 구문 강조 표시 레이어 (시각적 표시만, 클릭 투과) -->
                 <pre
                   :ref="(el) => setPreRef(index, el)"
                   class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-all p-2 font-mono text-xs leading-relaxed"
-                  v-html="highlightJson(getEditState(item).text)"
+                  v-html="highlightJson(getActiveJsonText(item))"
                 ></pre>
                 <!-- 투명 입력 레이어 (실제 편집 수신, 컨테이너 꽉 채움) -->
                 <textarea
-                  :value="getEditState(item).text"
+                  :value="getActiveJsonText(item)"
                   spellcheck="false"
                   class="absolute inset-0 h-full w-full resize-none whitespace-pre-wrap break-all bg-transparent p-2 font-mono text-xs leading-relaxed text-transparent caret-gray-800 outline-none"
                   @input="handleJsonEdit(item, $event)"
@@ -551,7 +749,7 @@ onMounted(() => {
                 ></textarea>
               </div>
               <!-- JSON 에러 표시 -->
-              <span v-if="getEditState(item).error" class="mt-1 block text-xs text-red-500">
+              <span v-if="getActiveJsonError(item)" class="mt-1 block text-xs text-red-500">
                 JSON 형식 오류
               </span>
             </div>
@@ -560,8 +758,8 @@ onMounted(() => {
             <div class="w-3/5 min-w-0">
               <!-- ===== 지시문 ===== -->
               <template v-if="item._type === 'instruction'">
-                <!-- 상단: 지시문 {no} [{no_list}] {score}점 + 저장 -->
-                <div class="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+                <!-- 상단: 지시문 {no} [{no_list}] {score}점 -->
+                <div class="mb-3 border-b border-gray-200 pb-2">
                   <div class="flex items-baseline gap-2 text-sm">
                     <span class="font-bold text-gray-800">지시문 {{ item.ins_no }}</span>
                     <span
@@ -581,12 +779,6 @@ onMounted(() => {
                       {{ getEditState(item).parsed.score }}점
                     </span>
                   </div>
-                  <button
-                    class="shrink-0 rounded border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100"
-                    @click="handleSaveItem(item)"
-                  >
-                    저장
-                  </button>
                 </div>
                 <!-- 본문 -->
                 <template v-if="getEditState(item).parsed">
@@ -608,8 +800,8 @@ onMounted(() => {
 
               <!-- ===== 문항 ===== -->
               <template v-if="item._type === 'question'">
-                <!-- 상단: {no}번(정답 색상) {section} {type} {score}점 + 저장 -->
-                <div class="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+                <!-- 상단: {no}번(정답 색상) {section} {type} {score}점 -->
+                <div class="mb-3 border-b border-gray-200 pb-2">
                   <div class="flex items-baseline gap-2 text-sm">
                     <span
                       class="font-bold"
@@ -643,12 +835,6 @@ onMounted(() => {
                       {{ getEditState(item).parsed.score }}점
                     </span>
                   </div>
-                  <button
-                    class="shrink-0 rounded border border-gray-300 px-3 py-1 text-xs hover:bg-gray-100"
-                    @click="handleSaveItem(item)"
-                  >
-                    저장
-                  </button>
                 </div>
                 <!-- 본문 -->
                 <template v-if="getEditState(item).parsed">

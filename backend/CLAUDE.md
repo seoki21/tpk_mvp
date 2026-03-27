@@ -8,7 +8,7 @@
 - **DB 드라이버**: psycopg v3 (ORM 미사용, SQL 직접 작성)
 - **인증**: python-jose (JWT)
 - **입력 검증**: Pydantic v2
-- **AI 연동**: anthropic SDK (Claude API)
+- **AI 연동**: anthropic SDK (Claude API), google-genai SDK (Gemini API)
 
 ## 디렉토리 구조
 
@@ -95,6 +95,8 @@ cursor.execute(
 | `UPLOAD_DIR`         | 파일 업로드 저장 경로  | `./uploads` (기본값)       |
 | `ANTHROPIC_API_KEY`  | Anthropic API 키       | (API 키)                   |
 | `ANTHROPIC_MODEL`    | Claude 모델명          | `claude-sonnet-4-6`      |
+| `GOOGLE_AI_API_KEY`  | Google AI API 키       | (API 키)                   |
+| `GOOGLE_AI_MODEL`    | Gemini 모델명          | `gemini-2.5-flash`       |
 
 > `config.py`에서 개별 환경변수를 조합하여 `DATABASE_URL`을 생성한다.
 
@@ -123,6 +125,11 @@ cursor.execute(
 
 ## AI 피드백
 
-- TOPIK 문제에 대한 AI 기반 학습 피드백 생성
-- API 경로: `POST /api/v1/ai/feedback`
-- 한국어/영어/일본어 응답 지원
+- TOPIK 문제에 대한 AI 기반 다국어 피드백 생성 (ko/en/ja/zh/vi)
+- Claude 또는 Gemini 선택 가능 (`ai_provider` 파라미터)
+- API 경로:
+  - 단건 생성: `POST /api/v1/exam-feedback/generate-single`
+  - 일괄 생성: `POST /api/v1/exam-feedback/{exam_key}/generate`
+  - 단건 저장: `POST /api/v1/exam-feedback/{exam_key}/save-single`
+  - 단건 업데이트(문제+피드백): `POST /api/v1/exam-feedback/{exam_key}/update-single`
+- 프롬프트: `app/prompts/feedback_generate.txt` (`.replace()` 방식 치환, `.format()` 사용 금지)

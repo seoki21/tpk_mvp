@@ -6,14 +6,15 @@
   - 하단: 저장 버튼 (문제→tb_exam_question, 지시문→tb_exam_instruction)
 -->
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
 import { getInlineViewUrl } from '@/api/examFile';
 import {
   convertPdfToJsonStream,
   bulkSave,
-  getQuestionsAndInstructions
+  getQuestionsAndInstructions,
+  generateFeedback
 } from '@/api/examQuestion';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
@@ -27,14 +28,32 @@ const pdfKey = computed(() => Number(route.params.pdfKey) || null);
 
 /* ========== 상태 ========== */
 
-/** JSON 변환 결과 텍스트 */
+/** 우측 탭 상태: 'question' | 'feedback' */
+const activeTab = ref('question');
+
+/** 문제 JSON 변환 결과 텍스트 */
 const jsonText = ref('');
 
-/** 변환 로딩 상태 */
+/** 피드백 JSON 텍스트 */
+const feedbackJsonText = ref('');
+
+/** 문제 변환 로딩 상태 */
 const converting = ref(false);
+
+/** 피드백 변환 로딩 상태 */
+const feedbackConverting = ref(false);
 
 /** 스트리밍 상태: idle | connecting | streaming | done | error | loaded */
 const streamStatus = ref('idle');
+
+/** JSON 변환(문제) 드롭다운 메뉴 표시 여부 */
+const showConvertMenu = ref(false);
+
+/** 피드백 변환 드롭다운 메뉴 표시 여부 */
+const showFeedbackMenu = ref(false);
+
+/** 선택된 AI 제공자 (드롭다운에서 선택 시 설정) */
+const selectedAiProvider = ref('claude');
 
 /** 토큰 사용량 정보 */
 const tokenUsage = ref(null);
@@ -42,8 +61,11 @@ const tokenUsage = ref(null);
 /** 저장 확인 다이얼로그 */
 const showConfirm = ref(false);
 
-/** JSON 변환 확인 다이얼로그 */
+/** 문제 JSON 변환 확인 다이얼로그 */
 const showConvertConfirm = ref(false);
+
+/** 피드백 JSON 변환 확인 다이얼로그 */
+const showFeedbackConvertConfirm = ref(false);
 
 /** JSON 결과 영역 ref (자동 스크롤용) */
 const jsonContainer = ref(null);
@@ -80,7 +102,7 @@ const fileName = computed(() => {
 const statusMessage = computed(() => {
   switch (streamStatus.value) {
     case 'connecting':
-      return 'Claude API 연결 중...';
+      return `${selectedAiProvider.value === 'gemini' ? 'Gemini' : 'Claude'} API 연결 중...`;
     case 'streaming':
       return '변환 중...';
     case 'done':
@@ -95,6 +117,21 @@ const statusMessage = computed(() => {
     default:
       return '';
   }
+});
+
+/* ========== 드롭다운 외부 클릭 닫기 ========== */
+
+function handleOutsideClick() {
+  showConvertMenu.value = false;
+  showFeedbackMenu.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleOutsideClick);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleOutsideClick);
 });
 
 /* ========== 초기 데이터 로드 ========== */
@@ -131,6 +168,7 @@ async function loadSavedJson(ek) {
 
     if (savedQuestions.length === 0 && savedInstructions.length === 0) return;
 
+    /* 문제 탭: 지시문 + 문제를 번호순 정렬하여 JSON 배열로 복원 */
     const items = [];
 
     savedInstructions.forEach((ins) => {
@@ -161,6 +199,22 @@ async function loadSavedJson(ek) {
 
     const jsonArray = items.map((item) => item.data);
     jsonText.value = JSON.stringify(jsonArray, null, 2);
+
+    /* 피드백 탭: 문제별 feedback_json을 { question_no: feedback } 형태로 복원 */
+    const feedbackMap = {};
+    savedQuestions.forEach((q) => {
+      if (q.feedback_json) {
+        try {
+          feedbackMap[q.question_no] = JSON.parse(q.feedback_json);
+        } catch {
+          /* 파싱 실패 시 건너뜀 */
+        }
+      }
+    });
+    if (Object.keys(feedbackMap).length > 0) {
+      feedbackJsonText.value = JSON.stringify(feedbackMap, null, 2);
+    }
+
     streamStatus.value = 'loaded';
   } catch {
     /* 조회 실패 시 무시 */
@@ -179,13 +233,18 @@ function scrollToBottom() {
 
 /* ========== 액션 ========== */
 
-/** JSON 변환 버튼 클릭 → 확인 다이얼로그 표시 */
-function handleConvert() {
+/**
+ * JSON 변환(문제) 드롭다운에서 AI 제공자 선택 시 호출
+ * @param {string} provider - 'claude' 또는 'gemini'
+ */
+function handleConvertWithProvider(provider) {
+  showConvertMenu.value = false;
   if (!examKey.value || !pdfKey.value) return;
+  selectedAiProvider.value = provider;
   showConvertConfirm.value = true;
 }
 
-/** 변환 확인 후 실행 — Claude API SSE 스트리밍 호출 */
+/** 변환 확인 후 실행 — 선택된 AI API SSE 스트리밍 호출 */
 async function confirmConvert() {
   showConvertConfirm.value = false;
 
@@ -219,12 +278,54 @@ async function confirmConvert() {
           alert(event.data.detail || 'PDF 변환에 실패했습니다.');
           break;
       }
-    });
+    }, selectedAiProvider.value);
   } catch {
     streamStatus.value = 'error';
     alert('PDF 변환 중 네트워크 오류가 발생했습니다.');
   } finally {
     converting.value = false;
+  }
+}
+
+/**
+ * 피드백 변환 드롭다운에서 AI 제공자 선택 시 호출
+ * @param {string} provider - 'claude' 또는 'gemini'
+ */
+function handleFeedbackConvertWithProvider(_provider) {
+  showFeedbackMenu.value = false;
+  alert('현재(26.03.27) 피드백은 일괄 생성할 수 없습니다. (단건 생성 또는 파일 업로드만 가능)');
+}
+
+/**
+ * 피드백 변환 확인 후 실행
+ * exam_key 기반 일괄 API로 모든 문제의 피드백을 생성한다.
+ * DB에 저장된 question_json을 서버에서 조회하여 처리한다.
+ */
+async function confirmFeedbackConvert() {
+  showFeedbackConvertConfirm.value = false;
+
+  if (!examKey.value) {
+    alert('시험 정보가 없습니다.');
+    return;
+  }
+
+  feedbackConverting.value = true;
+
+  try {
+    const res = await generateFeedback(examKey.value, selectedAiProvider.value);
+    const data = res.data || {};
+    const msg = `피드백 변환 완료\n- 전체: ${data.total}건\n- 성공: ${data.success}건\n- 실패: ${data.failed}건`;
+
+    /* 피드백 결과를 다시 로드하여 피드백 탭에 표시 */
+    await loadSavedJson(examKey.value);
+
+    /* 피드백 탭으로 전환 */
+    activeTab.value = 'feedback';
+    alert(msg);
+  } catch (error) {
+    alert(error.detail || '피드백 변환에 실패했습니다.');
+  } finally {
+    feedbackConverting.value = false;
   }
 }
 
@@ -365,13 +466,73 @@ function goBack() {
         <span>{{ statusMessage }}</span>
       </div>
       <div class="flex gap-2">
-        <button
-          class="rounded-md border border-blue-300 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-          :disabled="converting"
-          @click="handleConvert"
-        >
-          {{ converting ? '변환 중...' : 'JSON 변환(일괄)' }}
-        </button>
+        <!-- JSON 변환(문제) 드롭다운 버튼 -->
+        <div class="relative">
+          <button
+            class="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+            :disabled="converting || feedbackConverting"
+            @click.stop="showConvertMenu = !showConvertMenu; showFeedbackMenu = false"
+          >
+            {{ converting ? '변환 중...' : 'JSON 변환(문제)' }}
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <!-- 드롭다운 메뉴 -->
+          <div
+            v-if="showConvertMenu"
+            class="absolute right-0 z-10 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          >
+            <button
+              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+              @click="handleConvertWithProvider('claude')"
+            >
+              <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
+              Claude
+            </button>
+            <button
+              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+              @click="handleConvertWithProvider('gemini')"
+            >
+              <span class="inline-block h-2 w-2 rounded-full bg-blue-400"></span>
+              Gemini
+            </button>
+          </div>
+        </div>
+
+        <!-- JSON 변환(피드백) 드롭다운 버튼 -->
+        <div class="relative">
+          <button
+            class="inline-flex items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-4 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+            :disabled="feedbackConverting || converting || !jsonText"
+            @click.stop="showFeedbackMenu = !showFeedbackMenu; showConvertMenu = false"
+          >
+            {{ feedbackConverting ? '변환 중...' : 'JSON 변환(피드백)' }}
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <!-- 드롭다운 메뉴 -->
+          <div
+            v-if="showFeedbackMenu"
+            class="absolute right-0 z-10 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          >
+            <button
+              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50"
+              @click="handleFeedbackConvertWithProvider('claude')"
+            >
+              <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
+              Claude
+            </button>
+            <button
+              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50"
+              @click="handleFeedbackConvertWithProvider('gemini')"
+            >
+              <span class="inline-block h-2 w-2 rounded-full bg-blue-400"></span>
+              Gemini
+            </button>
+          </div>
+        </div>
         <button
           class="rounded-md px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300"
           :disabled="!jsonText"
@@ -408,9 +569,36 @@ function goBack() {
         </div>
       </div>
 
-      <!-- 우측: JSON 결과 -->
+      <!-- 우측: JSON 결과 (문제/피드백 탭) -->
       <div class="flex w-1/2 flex-col">
-        <div ref="jsonContainer" class="flex-1 overflow-auto bg-gray-900 p-4">
+        <!-- 탭바 -->
+        <div class="flex border-b border-gray-700 bg-gray-800 px-4">
+          <button
+            class="px-4 py-2 text-sm transition-colors"
+            :class="
+              activeTab === 'question'
+                ? 'border-b-2 border-blue-400 font-medium text-blue-400'
+                : 'text-gray-400 hover:text-gray-200'
+            "
+            @click="activeTab = 'question'"
+          >
+            문제
+          </button>
+          <button
+            class="px-4 py-2 text-sm transition-colors"
+            :class="
+              activeTab === 'feedback'
+                ? 'border-b-2 border-blue-400 font-medium text-blue-400'
+                : 'text-gray-400 hover:text-gray-200'
+            "
+            @click="activeTab = 'feedback'"
+          >
+            피드백
+          </button>
+        </div>
+
+        <!-- 문제 탭 내용 -->
+        <div v-show="activeTab === 'question'" ref="jsonContainer" class="flex-1 overflow-auto bg-gray-900 p-4">
           <pre
             v-if="jsonText"
             class="whitespace-pre-wrap text-sm leading-relaxed text-green-400"
@@ -430,12 +618,24 @@ function goBack() {
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <p>Claude API 연결 중...</p>
+              <p>{{ selectedAiProvider === 'gemini' ? 'Gemini' : 'Claude' }} API 연결 중...</p>
               <p class="mt-1 text-xs text-gray-500">PDF 파일을 분석하고 있습니다.</p>
             </div>
           </div>
           <div v-else class="flex h-full items-center justify-center text-gray-500">
             'JSON 변환(일괄)' 버튼을 클릭하세요.
+          </div>
+        </div>
+
+        <!-- 피드백 탭 내용 -->
+        <div v-show="activeTab === 'feedback'" class="flex-1 overflow-auto bg-gray-900 p-4">
+          <pre
+            v-if="feedbackJsonText"
+            class="whitespace-pre-wrap text-sm leading-relaxed text-green-400"
+            >{{ feedbackJsonText }}</pre
+          >
+          <div v-else class="flex h-full items-center justify-center text-gray-500">
+            피드백 데이터가 없습니다.
           </div>
         </div>
       </div>
@@ -444,7 +644,7 @@ function goBack() {
     <!-- JSON 변환 확인 다이얼로그 -->
     <ConfirmDialog
       :visible="showConvertConfirm"
-      message="JSON 변환을 시작하시겠습니까?&#10;(주의: CLAUDE API를 호출하여 시간이 오래 걸리거나 토큰 사용량이 많아질 수 있습니다)"
+      :message="`JSON 변환을 시작하시겠습니까?\n(주의: ${selectedAiProvider === 'gemini' ? 'Gemini' : 'Claude'} API를 호출하여 시간이 오래 걸리거나 토큰 사용량이 많아질 수 있습니다)`"
       @confirm="confirmConvert"
       @cancel="showConvertConfirm = false"
     />
@@ -455,6 +655,14 @@ function goBack() {
       message="저장하시겠습니까?"
       @confirm="confirmSave"
       @cancel="showConfirm = false"
+    />
+
+    <!-- 피드백 변환 확인 다이얼로그 -->
+    <ConfirmDialog
+      :visible="showFeedbackConvertConfirm"
+      :message="`피드백 JSON 변환을 시작하시겠습니까?\n(주의: 문제 수만큼 ${selectedAiProvider === 'gemini' ? 'Gemini' : 'Claude'} API를 호출합니다)`"
+      @confirm="confirmFeedbackConvert"
+      @cancel="showFeedbackConvertConfirm = false"
     />
   </div>
 </template>

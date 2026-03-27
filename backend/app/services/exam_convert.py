@@ -1,7 +1,6 @@
 """
 기출문항 PDF → JSON 변환 서비스 모듈
-Anthropic Claude API의 PDF 분석 기능을 사용하여 기출문제 PDF를 JSON으로 변환한다.
-anthropic Python SDK의 AsyncAnthropic 클라이언트와 스트리밍 API를 사용한다.
+Anthropic Claude API 또는 Google Gemini API의 PDF 분석 기능을 사용하여 기출문제 PDF를 JSON으로 변환한다.
 SSE(Server-Sent Events) 형식으로 변환 결과를 실시간 전달한다.
 """
 import os
@@ -10,12 +9,20 @@ import base64
 import asyncio
 from typing import Optional, AsyncGenerator
 import anthropic
-from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, UPLOAD_DIR
+from google import genai
+from app.config import (
+    ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
+    GOOGLE_AI_API_KEY, GOOGLE_AI_MODEL,
+    UPLOAD_DIR,
+)
 from app.services.exam_file import get_file
 
 
 # Anthropic 비동기 클라이언트 싱글턴
 _async_client: Optional[anthropic.AsyncAnthropic] = None
+
+# Google AI 클라이언트 싱글턴 (비동기)
+_google_client: Optional[genai.Client] = None
 
 
 def _get_async_client() -> anthropic.AsyncAnthropic:
@@ -31,10 +38,29 @@ def _get_async_client() -> anthropic.AsyncAnthropic:
     return _async_client
 
 
+def _get_google_client() -> genai.Client:
+    """
+    Google AI 클라이언트 싱글턴을 반환한다.
+    API 키가 설정되지 않은 경우 명확한 에러를 발생시킨다.
+    """
+    global _google_client
+    if _google_client is None:
+        if not GOOGLE_AI_API_KEY:
+            raise ValueError("GOOGLE_AI_API_KEY 환경변수가 설정되지 않았습니다.")
+        _google_client = genai.Client(api_key=GOOGLE_AI_API_KEY)
+    return _google_client
+
+
 def _read_pdf_as_base64(file_path: str) -> str:
     """PDF 파일을 읽어 base64 문자열로 반환한다. (동기 I/O)"""
     with open(file_path, "rb") as f:
         return base64.standard_b64encode(f.read()).decode("utf-8")
+
+
+def _read_pdf_bytes(file_path: str) -> bytes:
+    """PDF 파일을 읽어 바이트 데이터로 반환한다. (동기 I/O)"""
+    with open(file_path, "rb") as f:
+        return f.read()
 
 
 def _format_sse(event: str, data: dict) -> str:
@@ -42,79 +68,47 @@ def _format_sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-# PDF 분석 프롬프트 (CLAUDE.md에 정의된 프롬프트)
-_PDF_CONVERT_PROMPT = """첨부의 기출문제를 분석하고 json으로 변환해줘
- - 읽기 유형만 진행
- - 결과가 100 line 이상되면 종료할 것
-
-1. 아래 유형의 지시문
-   * 유형
-      * ※ [1~2] ( )에 들어갈 말로 가장 알맞은 것을 고르십시오. (각 2점)
-      * 지시문 하단에 문단이 제시되어 있으면 paragraph key 값에 추가
-   * json key 값
-      * item_type : 'I'
-      * full_sentence : ex. ※ [1~2] ( )에 들어갈 말로 가장 알맞은 것을 고르십시오. (각 2점)
-      * paragraph : full_sentence 아래 문단 내용
-      * no_list : 번호 목록, ex. [1, 2]
-      * instruction : ex. ( )에 들어갈 말로 가장 알맞은 것을 고르십시오.
-      * score : 점수, ex. 2
-
-2. 문제 유형
-   * json key 값
-      * item_type : 'Q'
-      * no : 문제 번호
-      * score : 점수
-      * section : 읽기, 쓰기, ...
-      * type : 문제 유형
-      * question_text : 문제
-      * choices : 선택 옵션
-         * 선택 옵션의 번호는 아래와 같이 동그라미 형식으로 해줄 것
-         * "choices": ["① 식당", "② 은행", "③ 공원", "④ 서점"]
-      * correct_answer : 정답 (동그라미 형식이 아닌 숫자 형식으로 출력)
-      * feedback : 피드백
-         * 선택 옵션 번호별 피드백
-         * 번호별 정답여부와 피드백내용이 추가
-         * 정답여부에서 정답이면 'T', 오답이면 'F'
-         * 피드백내용은 한글로 정답이면 정답 피드백, 오답이면 오답피드백
-         * 피드백내용은 간결하고 읽기 좋게 20~40자 내외로 정리하고 한글의 경우 존대어를 사용한다.
-         * "feedback": ["①:정답여부_피드백내용", "②:정답여부_피드백내용", "③:정답여부_피드백내용", "④:정답여부_피드백내용"]
-
-3. 기타 사항
-   * json 순서는 번호 순서
-   * json의 지시문 위치는 no_list의 번호 앞에 위치
-   * 문항 중 json 파싱이 불가능한 문제는 위 예시가 아닌 notes 필드에 별도 정리
-      * notes : 파싱이 불가능한 번호와 불가능한 이유를 별도로 정리
-   * notes 필드는 번호와 불가능한 이유를 알기 쉽게 요약해서 정리
-   * notes 필드는 맨 아래 별도 json 형식으로 정리
-
-반드시 JSON 배열만 출력해줘. 마크다운 코드블록(```)으로 감싸지 말고, 순수 JSON만 응답해줘."""
+# PDF 분석 프롬프트 (외부 파일에서 로드)
+from app.utils.prompt_loader import load_prompt
+_PDF_CONVERT_PROMPT = load_prompt("pdf_convert")
 
 
-async def convert_pdf_to_json_stream(exam_key: int, pdf_key: int) -> AsyncGenerator[str, None]:
+def _get_pdf_file_info(pdf_key: int):
     """
-    PDF 파일을 Claude API 스트리밍으로 분석하여 SSE 이벤트를 생성한다.
+    PDF 파일 정보를 조회하고 경로를 확인한다.
 
     Args:
-        exam_key: 시험 PK
         pdf_key: PDF 파일 PK
 
-    Yields:
-        SSE 형식 문자열 (event: type\ndata: {...}\n\n)
+    Returns:
+        (file_info, file_path) 튜플
 
     Raises:
-        ValueError: API 키 미설정 또는 파일을 찾을 수 없음
+        ValueError: 파일을 찾을 수 없는 경우
     """
-    client = _get_async_client()
-
-    # PDF 파일 정보 조회
     file_info = get_file(pdf_key)
     if not file_info:
         raise ValueError(f"PDF 파일을 찾을 수 없습니다 (pdf_key={pdf_key})")
 
-    # PDF 파일 경로 구성 및 존재 확인
     file_path = os.path.join(UPLOAD_DIR, file_info["file_path"])
     if not os.path.exists(file_path):
         raise ValueError(f"PDF 파일이 존재하지 않습니다: {file_info['file_name']}")
+
+    return file_info, file_path
+
+
+async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerator[str, None]:
+    """
+    Claude API 스트리밍으로 PDF를 JSON으로 변환한다.
+
+    Args:
+        file_info: 파일 메타데이터
+        file_path: PDF 파일 경로
+
+    Yields:
+        SSE 형식 문자열
+    """
+    client = _get_async_client()
 
     # PDF 파일을 base64로 인코딩 (블로킹 I/O → 별도 스레드)
     pdf_data = await asyncio.to_thread(_read_pdf_as_base64, file_path)
@@ -168,5 +162,99 @@ async def convert_pdf_to_json_stream(exam_key: int, pdf_key: int) -> AsyncGenera
         yield _format_sse("error", {"detail": "AI API 요청 한도 초과. 잠시 후 다시 시도해 주세요."})
     except anthropic.AuthenticationError:
         yield _format_sse("error", {"detail": "AI API 인증 실패. 관리자에게 문의하세요."})
+    except anthropic.APIStatusError as e:
+        if e.status_code == 529:
+            yield _format_sse("error", {"detail": "AI 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해 주세요."})
+        else:
+            yield _format_sse("error", {"detail": f"PDF 변환 실패: {e.message}"})
     except anthropic.APIError as e:
+        yield _format_sse("error", {"detail": f"PDF 변환 실패: {e.message}"})
+
+
+async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerator[str, None]:
+    """
+    Google Gemini API 스트리밍으로 PDF를 JSON으로 변환한다.
+
+    Args:
+        file_info: 파일 메타데이터
+        file_path: PDF 파일 경로
+
+    Yields:
+        SSE 형식 문자열
+    """
+    client = _get_google_client()
+
+    # PDF 파일을 바이트로 읽기 (블로킹 I/O → 별도 스레드)
+    pdf_bytes = await asyncio.to_thread(_read_pdf_bytes, file_path)
+
+    # start 이벤트 전송
+    yield _format_sse("start", {
+        "file_name": file_info["file_name"],
+        "model": GOOGLE_AI_MODEL,
+    })
+
+    try:
+        # Gemini API 스트리밍 호출
+        response_stream = client.models.generate_content_stream(
+            model=GOOGLE_AI_MODEL,
+            contents=[
+                genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+                _PDF_CONVERT_PROMPT,
+            ],
+        )
+
+        # 텍스트 델타를 실시간 전송
+        input_tokens = 0
+        output_tokens = 0
+        for chunk in response_stream:
+            if chunk.text:
+                yield _format_sse("text_delta", {"text": chunk.text})
+            # 토큰 사용량 누적
+            if chunk.usage_metadata:
+                if chunk.usage_metadata.prompt_token_count:
+                    input_tokens = chunk.usage_metadata.prompt_token_count
+                if chunk.usage_metadata.candidates_token_count:
+                    output_tokens = chunk.usage_metadata.candidates_token_count
+
+        # 완료 이벤트 전송
+        yield _format_sse("done", {
+            "stop_reason": "end_turn",
+            "token_usage": {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            },
+        })
+
+    except Exception as e:
         yield _format_sse("error", {"detail": f"PDF 변환 실패: {str(e)}"})
+
+
+async def convert_pdf_to_json_stream(
+    exam_key: int, pdf_key: int, ai_provider: str = "claude"
+) -> AsyncGenerator[str, None]:
+    """
+    PDF 파일을 AI API 스트리밍으로 분석하여 SSE 이벤트를 생성한다.
+    ai_provider에 따라 Claude 또는 Gemini를 사용한다.
+
+    Args:
+        exam_key: 시험 PK
+        pdf_key: PDF 파일 PK
+        ai_provider: AI 제공자 ("claude" 또는 "gemini")
+
+    Yields:
+        SSE 형식 문자열 (event: type\ndata: {...}\n\n)
+
+    Raises:
+        ValueError: API 키 미설정, 파일 미존재, 지원하지 않는 제공자
+    """
+    # 공통: PDF 파일 정보 조회 및 경로 확인
+    file_info, file_path = _get_pdf_file_info(pdf_key)
+
+    if ai_provider == "gemini":
+        async for event in _convert_with_gemini(file_info, file_path):
+            yield event
+    elif ai_provider == "claude":
+        async for event in _convert_with_claude(file_info, file_path):
+            yield event
+    else:
+        raise ValueError(f"지원하지 않는 AI 제공자입니다: {ai_provider}")
