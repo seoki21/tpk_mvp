@@ -10,8 +10,10 @@ import { ref, watch, computed } from 'vue';
 import FormModal from '@/components/common/FormModal.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { useGroupCodeStore } from '@/stores/groupCode';
+import { useToast } from '@/composables/useToast';
 
 const store = useGroupCodeStore();
+const toast = useToast();
 
 const props = defineProps({
   /** 모달 표시 여부 */
@@ -83,10 +85,10 @@ async function handleSave() {
     } else {
       await store.create(form.value);
     }
-    alert('저장되었습니다');
+    toast.success('저장되었습니다');
     emit('saved');
   } catch (error) {
-    alert(error.detail || '오류가 발생했습니다');
+    toast.error(error.detail || '오류가 발생했습니다');
   }
 }
 
@@ -100,10 +102,10 @@ async function confirmDelete() {
   showConfirm.value = false;
   try {
     await store.remove(form.value.group_code);
-    alert('삭제되었습니다');
+    toast.success('삭제되었습니다');
     emit('saved');
   } catch (error) {
-    alert(error.detail || '오류가 발생했습니다');
+    toast.error(error.detail || '오류가 발생했습니다');
   }
 }
 

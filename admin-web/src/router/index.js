@@ -53,10 +53,17 @@ const router = createRouter({
           name: 'examConvert',
           component: () => import('../views/ExamConvertView.vue')
         },
+        /* 연습문제관리 */
         {
           path: 'practice-questions',
           name: 'practiceQuestions',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/PracticeQuestionListView.vue')
+        },
+        /* 연습문제 생성(API) — 연습문제관리에서 등록 버튼 클릭 시 진입 */
+        {
+          path: 'practice-questions/create',
+          name: 'practiceQuestionCreate',
+          component: () => import('../views/PracticeQuestionCreateView.vue')
         },
         {
           path: 'question-structures',

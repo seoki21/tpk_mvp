@@ -10,9 +10,14 @@ import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
 import { bulkSave, generateFeedback, generateFeedbackSingle, updateQuestionSingle } from '@/api/examQuestion';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
+import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
+import ExamQuestionCard from '@/components/examQuestion/ExamQuestionCard.vue';
+import JsonEditorPanel from '@/components/examQuestion/JsonEditorPanel.vue';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const store = useExamQuestionStore();
+const toast = useToast();
 
 /* ========== 확인 다이얼로그 ========== */
 const showConfirm = ref(false);
@@ -28,8 +33,6 @@ const confirmCallback = ref(null);
  */
 const editStates = reactive(new Map());
 
-/** pre 요소 참조 (스크롤 동기화용) */
-const preRefs = ref({});
 
 /**
  * 항목의 고유 키를 생성한다.
@@ -99,12 +102,12 @@ watch(
  * 좌측 JSON 편집 시 실시간 파싱하여 우측 UI에 반영한다.
  * 파싱 실패 시 마지막 유효 parsed를 유지하여 우측 깨짐을 방지한다.
  */
-function handleJsonEdit(item, event) {
+function handleJsonEditFromPanel(item, newText) {
   const state = getEditState(item);
   const isFeedbackTab = item._type === 'question' && state.activeTab === 'feedback';
 
   if (isFeedbackTab) {
-    state.feedbackText = event.target.value;
+    state.feedbackText = newText;
     try {
       state.feedbackParsed = JSON.parse(state.feedbackText);
       state.feedbackError = false;
@@ -112,7 +115,7 @@ function handleJsonEdit(item, event) {
       state.feedbackError = true;
     }
   } else {
-    state.text = event.target.value;
+    state.text = newText;
     try {
       state.parsed = JSON.parse(state.text);
       state.error = false;
@@ -141,23 +144,6 @@ function getActiveJsonError(item) {
   return state.error;
 }
 
-/**
- * textarea 스크롤 시 pre 오버레이의 스크롤을 동기화한다.
- */
-function syncScroll(index, event) {
-  const pre = preRefs.value[index];
-  if (pre) {
-    pre.scrollTop = event.target.scrollTop;
-    pre.scrollLeft = event.target.scrollLeft;
-  }
-}
-
-/**
- * pre 요소 ref를 동적으로 설정하는 함수
- */
-function setPreRef(index, el) {
-  if (el) preRefs.value[index] = el;
-}
 
 /** 시험 선택 변경 */
 async function handleExamChange(event) {
@@ -177,7 +163,7 @@ async function handleFileChange(event) {
 /** JSON 변환(일괄) 버튼 클릭 → 변환 페이지로 이동 */
 function handleConvertClick() {
   if (!store.selectedExamKey || !store.selectedPdfKey) {
-    alert('기출문제와 파일을 먼저 선택하세요.');
+    toast.warning('기출문제와 파일을 먼저 선택하세요.');
     return;
   }
   router.push({
@@ -193,7 +179,7 @@ function handleConvertClick() {
 function handleJsonUploadSelect(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  alert(`선택된 파일: ${file.name}\n(업로드 처리는 추후 구현 예정)`);
+  toast.info(`선택된 파일: ${file.name}\n(업로드 처리는 추후 구현 예정)`);
   /* input 초기화 (같은 파일 재선택 가능하도록) */
   event.target.value = '';
 }
@@ -215,7 +201,7 @@ async function handleSaveAll() {
     if (state.error || (item._type === 'question' && state.feedbackError)) {
       const label =
         item._type === 'question' ? `${item.question_no}번 문제` : `지시문 ${item.ins_no}`;
-      alert(`${label}의 JSON 형식이 올바르지 않습니다. 수정 후 다시 시도하세요.`);
+      toast.error(`${label}의 JSON 형식이 올바르지 않습니다. 수정 후 다시 시도하세요.`);
       return;
     }
 
@@ -226,7 +212,7 @@ async function handleSaveAll() {
     } catch {
       const label =
         item._type === 'question' ? `${item.question_no}번 문제` : `지시문 ${item.ins_no}`;
-      alert(`${label}의 JSON 형식이 올바르지 않습니다.`);
+      toast.error(`${label}의 JSON 형식이 올바르지 않습니다.`);
       return;
     }
 
@@ -246,7 +232,7 @@ async function handleSaveAll() {
         try {
           questionData.feedback_json = JSON.stringify(JSON.parse(state.feedbackText));
         } catch {
-          alert(`${item.question_no}번 문제의 피드백 JSON 형식이 올바르지 않습니다.`);
+          toast.error(`${item.question_no}번 문제의 피드백 JSON 형식이 올바르지 않습니다.`);
           return;
         }
       }
@@ -263,10 +249,10 @@ async function handleSaveAll() {
   confirmCallback.value = async () => {
     try {
       await bulkSave(store.selectedExamKey, payload);
-      alert('저장되었습니다.');
+      toast.success('저장되었습니다.');
       await store.fetchQuestionsAndInstructions(store.selectedExamKey);
     } catch (error) {
-      alert(error.detail || '저장에 실패했습니다.');
+      toast.error(error.detail || '저장에 실패했습니다.');
     }
   };
   showConfirm.value = true;
@@ -284,42 +270,7 @@ function handleCancel() {
   confirmCallback.value = null;
 }
 
-/**
- * JSON 텍스트에 구문 강조 HTML을 적용한다.
- * 키(보라), 문자열 값(초록), 숫자(파랑), boolean/null(주황) 색상 적용.
- * 입력은 이미 pretty-print된 텍스트를 받으므로 재파싱하지 않는다.
- * 마지막에 줄바꿈을 추가하여 textarea와 높이를 맞춘다.
- */
-function highlightJson(text) {
-  if (!text) return '{}';
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  return (
-    escaped
-      .replace(/"([^"]+)"(?=\s*:)/g, '<span class="text-purple-600">"$1"</span>')
-      .replace(/:\s*"([^"]*)"/g, ': <span class="text-green-600">"$1"</span>')
-      .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-blue-600">$1</span>')
-      .replace(/:\s*(true|false|null)/g, ': <span class="text-orange-600">$1</span>') + '\n'
-  );
-}
 
-/**
- * 피드백 문자열 파싱
- * "①:T_정답 설명" → { label: "①", isCorrect: true, text: "정답 설명" }
- */
-function parseFeedback(fb) {
-  if (!fb || typeof fb !== 'string') return { label: '', isCorrect: false, text: fb || '' };
-  const colonIdx = fb.indexOf(':');
-  if (colonIdx === -1) return { label: '', isCorrect: false, text: fb };
-  const label = fb.substring(0, colonIdx);
-  const rest = fb.substring(colonIdx + 1);
-  const isCorrect = rest.startsWith('T');
-  const underscoreIdx = rest.indexOf('_');
-  const text = underscoreIdx !== -1 ? rest.substring(underscoreIdx + 1) : rest;
-  return { label, isCorrect, text };
-}
 
 /**
  * 문항의 정답 번호를 반환한다.
@@ -386,30 +337,6 @@ function getFeedbackData(item) {
   return { tabs: [], source: 'none' };
 }
 
-/** 피드백 탭 활성 상태 관리 (key: itemKey, value: 활성 탭 lang 키) */
-const feedbackActiveTab = reactive({});
-
-/** 피드백 탭 선택 */
-function setFeedbackTab(item, lang) {
-  feedbackActiveTab[itemKey(item)] = lang;
-}
-
-/** 피드백 활성 탭 반환 (기본: 첫 번째 탭) */
-function getActiveFeedbackTab(item) {
-  const data = getFeedbackData(item);
-  if (data.tabs.length === 0) return null;
-  const saved = feedbackActiveTab[itemKey(item)];
-  if (saved && data.tabs.some((t) => t.key === saved)) return saved;
-  return data.tabs[0].key;
-}
-
-/** 활성 탭의 피드백 리스트 반환 */
-function getActiveFeedbackList(item) {
-  const data = getFeedbackData(item);
-  const activeKey = getActiveFeedbackTab(item);
-  const tab = data.tabs.find((t) => t.key === activeKey);
-  return tab ? tab.list : [];
-}
 
 /**
  * 기출문제 selectbox 표시 텍스트 생성
@@ -431,13 +358,13 @@ const feedbackGenerating = ref(false);
  * 피드백 생성 버튼 클릭 핸들러
  * Claude API를 통해 모든 문제의 다국어 피드백을 일괄 생성한다.
  */
-async function handleGenerateFeedback() {
+async function _handleGenerateFeedback() {
   if (!store.selectedExamKey) {
-    alert('기출문제를 먼저 선택하세요.');
+    toast.warning('기출문제를 먼저 선택하세요.');
     return;
   }
   if (store.mergedItems.filter((i) => i._type === 'question').length === 0) {
-    alert('피드백을 생성할 문제가 없습니다.');
+    toast.warning('피드백을 생성할 문제가 없습니다.');
     return;
   }
 
@@ -448,11 +375,11 @@ async function handleGenerateFeedback() {
       const res = await generateFeedback(store.selectedExamKey);
       const data = res.data || {};
       const msg = `피드백 생성 완료\n- 전체: ${data.total}건\n- 성공: ${data.success}건\n- 실패: ${data.failed}건`;
-      alert(msg);
+      toast.success(msg);
       /* 목록 새로고침하여 feedback_json 반영 */
       await store.fetchQuestionsAndInstructions(store.selectedExamKey);
     } catch (error) {
-      alert(error.detail || '피드백 생성에 실패했습니다.');
+      toast.error(error.detail || '피드백 생성에 실패했습니다.');
     } finally {
       feedbackGenerating.value = false;
     }
@@ -488,7 +415,7 @@ async function handleGenerateFeedbackForItem(item) {
         state.activeTab = 'feedback';
       }
     } catch (error) {
-      alert(error.detail || '피드백 생성에 실패했습니다.');
+      toast.error(error.detail || '피드백 생성에 실패했습니다.');
     } finally {
       feedbackGenerating.value = false;
     }
@@ -516,7 +443,7 @@ async function handleSaveItemSingle(item) {
     try {
       questionMinified = JSON.stringify(JSON.parse(state.text));
     } catch {
-      alert('문제 JSON 형식이 올바르지 않습니다.');
+      toast.error('문제 JSON 형식이 올바르지 않습니다.');
       return;
     }
   }
@@ -527,7 +454,7 @@ async function handleSaveItemSingle(item) {
     try {
       feedbackMinified = JSON.stringify(JSON.parse(state.feedbackText));
     } catch {
-      alert('피드백 JSON 형식이 올바르지 않습니다.');
+      toast.error('피드백 JSON 형식이 올바르지 않습니다.');
       return;
     }
   }
@@ -539,9 +466,9 @@ async function handleSaveItemSingle(item) {
       await updateQuestionSingle(
         store.selectedExamKey, questionNo, questionMinified, feedbackMinified
       );
-      alert('저장되었습니다.');
+      toast.success('저장되었습니다.');
     } catch (error) {
-      alert(error.detail || '저장에 실패했습니다.');
+      toast.error(error.detail || '저장에 실패했습니다.');
     } finally {
       itemSaving.value = false;
     }
@@ -684,237 +611,36 @@ onMounted(() => {
         <!-- 항목 목록 -->
         <div v-if="!store.loading && store.mergedItems.length > 0" class="divide-y divide-gray-200">
           <div v-for="(item, index) in store.mergedItems" :key="index" class="flex gap-4 p-4">
-            <!-- 좌측: JSON 편집 영역 (40%, 오버레이 구문 강조, 우측과 같은 높이) -->
-            <div class="flex w-2/5 shrink-0 flex-col">
-              <!-- 탭바 (문제 항목만 — 문제/피드백 전환) -->
-              <div
-                v-if="item._type === 'question'"
-                class="mb-1 flex items-center gap-1 border-b border-gray-200 pb-1"
-              >
-                <button
-                  class="rounded-t px-2.5 py-1 text-xs transition-colors"
-                  :class="
-                    getEditState(item).activeTab === 'question'
-                      ? 'border-b-2 border-blue-500 font-medium text-blue-700'
-                      : 'text-gray-400 hover:text-gray-600'
-                  "
-                  @click="setJsonTab(item, 'question')"
-                >
-                  문제
-                </button>
-                <button
-                  class="rounded-t px-2.5 py-1 text-xs transition-colors"
-                  :class="
-                    getEditState(item).activeTab === 'feedback'
-                      ? 'border-b-2 border-blue-500 font-medium text-blue-700'
-                      : 'text-gray-400 hover:text-gray-600'
-                  "
-                  @click="setJsonTab(item, 'feedback')"
-                >
-                  피드백
-                </button>
-                <button
-                  class="ml-auto rounded border border-purple-300 bg-purple-50 px-2 py-0.5 text-[11px] text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="feedbackGenerating"
-                  @click="handleGenerateFeedbackForItem(item)"
-                >
-                  {{ feedbackGenerating ? '생성 중...' : '피드백 생성(API)' }}
-                </button>
-                <button
-                  class="rounded border border-gray-300 bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="itemSaving"
-                  @click="handleSaveItemSingle(item)"
-                >
-                  {{ itemSaving ? '저장 중...' : '저장' }}
-                </button>
-              </div>
-              <!-- JSON 편집기 -->
-              <div
-                class="relative min-h-[80px] flex-1 overflow-hidden rounded border bg-gray-50"
-                :class="getActiveJsonError(item) ? 'border-red-400' : 'border-gray-200'"
-              >
-                <!-- 구문 강조 표시 레이어 (시각적 표시만, 클릭 투과) -->
-                <pre
-                  :ref="(el) => setPreRef(index, el)"
-                  class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-all p-2 font-mono text-xs leading-relaxed"
-                  v-html="highlightJson(getActiveJsonText(item))"
-                ></pre>
-                <!-- 투명 입력 레이어 (실제 편집 수신, 컨테이너 꽉 채움) -->
-                <textarea
-                  :value="getActiveJsonText(item)"
-                  spellcheck="false"
-                  class="absolute inset-0 h-full w-full resize-none whitespace-pre-wrap break-all bg-transparent p-2 font-mono text-xs leading-relaxed text-transparent caret-gray-800 outline-none"
-                  @input="handleJsonEdit(item, $event)"
-                  @scroll="syncScroll(index, $event)"
-                ></textarea>
-              </div>
-              <!-- JSON 에러 표시 -->
-              <span v-if="getActiveJsonError(item)" class="mt-1 block text-xs text-red-500">
-                JSON 형식 오류
-              </span>
-            </div>
+            <!-- 좌측: JSON 편집 영역 (40%) -->
+            <JsonEditorPanel
+              :item-type="item._type"
+              :json-text="getActiveJsonText(item)"
+              :has-error="getActiveJsonError(item)"
+              :active-tab="item._type === 'question' ? getEditState(item).activeTab : 'question'"
+              :feedback-generating="feedbackGenerating"
+              :item-saving="itemSaving"
+              @update:json-text="(val) => handleJsonEditFromPanel(item, val)"
+              @update:active-tab="(tab) => setJsonTab(item, tab)"
+              @generate-feedback="handleGenerateFeedbackForItem(item)"
+              @save-item="handleSaveItemSingle(item)"
+            />
 
             <!-- 우측: 시험지 UI (60%) -->
             <div class="w-3/5 min-w-0">
-              <!-- ===== 지시문 ===== -->
-              <template v-if="item._type === 'instruction'">
-                <!-- 상단: 지시문 {no} [{no_list}] {score}점 -->
-                <div class="mb-3 border-b border-gray-200 pb-2">
-                  <div class="flex items-baseline gap-2 text-sm">
-                    <span class="font-bold text-gray-800">지시문 {{ item.ins_no }}</span>
-                    <span
-                      v-if="
-                        getEditState(item).parsed &&
-                        getEditState(item).parsed.no_list &&
-                        getEditState(item).parsed.no_list.length
-                      "
-                      class="text-gray-500"
-                    >
-                      [{{ getEditState(item).parsed.no_list.join(', ') }}]
-                    </span>
-                    <span
-                      v-if="getEditState(item).parsed && getEditState(item).parsed.score"
-                      class="text-gray-500"
-                    >
-                      {{ getEditState(item).parsed.score }}점
-                    </span>
-                  </div>
-                </div>
-                <!-- 본문 -->
-                <template v-if="getEditState(item).parsed">
-                  <p
-                    v-if="getEditState(item).parsed.full_sentence"
-                    class="mb-2 text-sm leading-relaxed text-gray-800"
-                  >
-                    {{ getEditState(item).parsed.full_sentence }}
-                  </p>
-                  <div
-                    v-if="getEditState(item).parsed.paragraph"
-                    class="mt-2 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"
-                  >
-                    <p class="whitespace-pre-wrap">{{ getEditState(item).parsed.paragraph }}</p>
-                  </div>
-                </template>
-                <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>
-              </template>
-
-              <!-- ===== 문항 ===== -->
-              <template v-if="item._type === 'question'">
-                <!-- 상단: {no}번(정답 색상) {section} {type} {score}점 -->
-                <div class="mb-3 border-b border-gray-200 pb-2">
-                  <div class="flex items-baseline gap-2 text-sm">
-                    <span
-                      class="font-bold"
-                      :class="
-                        getCorrectAnswer(item)
-                          ? 'rounded bg-blue-600 px-1.5 py-0.5 text-white'
-                          : 'text-gray-800'
-                      "
-                    >
-                      {{ item.question_no }}번
-                      <template v-if="getCorrectAnswer(item)">
-                        (정답: {{ getCorrectAnswer(item) }})
-                      </template>
-                    </span>
-                    <span
-                      v-if="getEditState(item).parsed && getEditState(item).parsed.section"
-                      class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700"
-                    >
-                      {{ getEditState(item).parsed.section }}
-                    </span>
-                    <span
-                      v-if="getEditState(item).parsed && getEditState(item).parsed.type"
-                      class="rounded bg-green-50 px-1.5 py-0.5 text-green-700"
-                    >
-                      {{ getEditState(item).parsed.type }}
-                    </span>
-                    <span
-                      v-if="getEditState(item).parsed && getEditState(item).parsed.score"
-                      class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700"
-                    >
-                      {{ getEditState(item).parsed.score }}점
-                    </span>
-                  </div>
-                </div>
-                <!-- 본문 -->
-                <template v-if="getEditState(item).parsed">
-                  <p
-                    v-if="getEditState(item).parsed.full_sentence"
-                    class="mb-2 text-sm leading-relaxed text-gray-800"
-                  >
-                    {{ getEditState(item).parsed.full_sentence }}
-                  </p>
-                  <div
-                    v-if="getEditState(item).parsed.paragraph"
-                    class="mb-3 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"
-                  >
-                    <p class="whitespace-pre-wrap">
-                      {{ getEditState(item).parsed.paragraph }}
-                    </p>
-                  </div>
-                  <p
-                    v-if="getEditState(item).parsed.question_text"
-                    class="mb-2 text-sm leading-relaxed text-gray-800"
-                  >
-                    {{ item.question_no }}. {{ getEditState(item).parsed.question_text }}
-                  </p>
-                  <!-- 선택지 -->
-                  <div
-                    v-if="getEditState(item).parsed.choices"
-                    class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
-                  >
-                    <span
-                      v-for="(choice, ci) in getEditState(item).parsed.choices"
-                      :key="ci"
-                      class="text-gray-700"
-                    >
-                      {{ choice }}
-                    </span>
-                  </div>
-                  <!-- 피드백 영역 (다국어 탭바) -->
-                  <div
-                    v-if="getFeedbackData(item).tabs.length"
-                    class="mt-3 rounded border border-gray-100 bg-slate-50 px-3 pb-3 pt-2"
-                  >
-                    <!-- 탭바: 다국어 전환 -->
-                    <div class="mb-2 flex items-center gap-1 border-b border-gray-200 pb-1">
-                      <button
-                        v-for="tab in getFeedbackData(item).tabs"
-                        :key="tab.key"
-                        class="rounded-t px-2.5 py-1 text-sm transition-colors"
-                        :class="
-                          getActiveFeedbackTab(item) === tab.key
-                            ? 'border-b-2 border-blue-500 font-medium text-blue-700'
-                            : 'text-gray-400 hover:text-gray-600'
-                        "
-                        @click="setFeedbackTab(item, tab.key)"
-                      >
-                        {{ tab.label }}
-                      </button>
-                    </div>
-                    <!-- 피드백 리스트 (문제 텍스트와 동일한 text-sm) -->
-                    <div v-if="getActiveFeedbackList(item).length" class="space-y-1">
-                      <div
-                        v-for="(fb, fi) in getActiveFeedbackList(item)"
-                        :key="fi"
-                        class="flex items-start gap-1.5 text-sm leading-relaxed"
-                        :class="
-                          parseFeedback(fb).isCorrect
-                            ? 'font-medium text-blue-700'
-                            : 'text-gray-600'
-                        "
-                      >
-                        <span class="shrink-0">{{ parseFeedback(fb).label }}</span>
-                        <span>{{ parseFeedback(fb).text }}</span>
-                      </div>
-                    </div>
-                    <p v-else class="py-2 text-sm text-gray-400">
-                      피드백 데이터가 없습니다.
-                    </p>
-                  </div>
-                </template>
-                <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>
-              </template>
+              <!-- 지시문 렌더링 -->
+              <ExamInstructionCard
+                v-if="item._type === 'instruction'"
+                :item="item"
+                :parsed="getEditState(item).parsed"
+              />
+              <!-- 문항 렌더링 -->
+              <ExamQuestionCard
+                v-if="item._type === 'question'"
+                :item="item"
+                :parsed="getEditState(item).parsed"
+                :correct-answer="getCorrectAnswer(item)"
+                :feedback-data="getFeedbackData(item)"
+              />
             </div>
           </div>
         </div>

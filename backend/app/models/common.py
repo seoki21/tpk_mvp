@@ -2,10 +2,8 @@
 공통 응답 모델 정의
 모든 API 응답에서 사용하는 표준 응답 스키마를 정의한다.
 """
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Any, List
 from pydantic import BaseModel
-
-T = TypeVar("T")
 
 
 class BaseResponse(BaseModel):

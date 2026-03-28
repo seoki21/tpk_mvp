@@ -6,7 +6,7 @@
   - 하단: 저장 버튼 (문제→tb_exam_question, 지시문→tb_exam_instruction)
 -->
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
 import { getInlineViewUrl } from '@/api/examFile';
@@ -17,10 +17,13 @@ import {
   generateFeedback
 } from '@/api/examQuestion';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
+import AiProviderDropdown from '@/components/examQuestion/AiProviderDropdown.vue';
+import { useToast } from '@/composables/useToast';
 
 const route = useRoute();
 const router = useRouter();
 const store = useExamQuestionStore();
+const toast = useToast();
 
 /** route params에서 examKey, pdfKey 추출 */
 const examKey = computed(() => Number(route.params.examKey) || null);
@@ -46,11 +49,6 @@ const feedbackConverting = ref(false);
 /** 스트리밍 상태: idle | connecting | streaming | done | error | loaded */
 const streamStatus = ref('idle');
 
-/** JSON 변환(문제) 드롭다운 메뉴 표시 여부 */
-const showConvertMenu = ref(false);
-
-/** 피드백 변환 드롭다운 메뉴 표시 여부 */
-const showFeedbackMenu = ref(false);
 
 /** 선택된 AI 제공자 (드롭다운에서 선택 시 설정) */
 const selectedAiProvider = ref('claude');
@@ -119,20 +117,6 @@ const statusMessage = computed(() => {
   }
 });
 
-/* ========== 드롭다운 외부 클릭 닫기 ========== */
-
-function handleOutsideClick() {
-  showConvertMenu.value = false;
-  showFeedbackMenu.value = false;
-}
-
-onMounted(() => {
-  document.addEventListener('click', handleOutsideClick);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleOutsideClick);
-});
 
 /* ========== 초기 데이터 로드 ========== */
 
@@ -238,7 +222,6 @@ function scrollToBottom() {
  * @param {string} provider - 'claude' 또는 'gemini'
  */
 function handleConvertWithProvider(provider) {
-  showConvertMenu.value = false;
   if (!examKey.value || !pdfKey.value) return;
   selectedAiProvider.value = provider;
   showConvertConfirm.value = true;
@@ -267,21 +250,20 @@ async function confirmConvert() {
           streamStatus.value = 'done';
           tokenUsage.value = event.data.token_usage;
           if (event.data.stop_reason === 'max_tokens') {
-            alert(
-              'AI 응답이 최대 토큰 한도에 도달하여 JSON이 잘렸을 수 있습니다.\n' +
-                '저장 전에 JSON이 완전한지 확인해 주세요.'
+            toast.warning(
+              'AI 응답이 최대 토큰 한도에 도달하여 JSON이 잘렸을 수 있습니다.\n저장 전에 JSON이 완전한지 확인해 주세요.'
             );
           }
           break;
         case 'error':
           streamStatus.value = 'error';
-          alert(event.data.detail || 'PDF 변환에 실패했습니다.');
+          toast.error(event.data.detail || 'PDF 변환에 실패했습니다.');
           break;
       }
     }, selectedAiProvider.value);
   } catch {
     streamStatus.value = 'error';
-    alert('PDF 변환 중 네트워크 오류가 발생했습니다.');
+    toast.error('PDF 변환 중 네트워크 오류가 발생했습니다.');
   } finally {
     converting.value = false;
   }
@@ -292,8 +274,7 @@ async function confirmConvert() {
  * @param {string} provider - 'claude' 또는 'gemini'
  */
 function handleFeedbackConvertWithProvider(_provider) {
-  showFeedbackMenu.value = false;
-  alert('현재(26.03.27) 피드백은 일괄 생성할 수 없습니다. (단건 생성 또는 파일 업로드만 가능)');
+  toast.info('현재(26.03.27) 피드백은 일괄 생성할 수 없습니다. (단건 생성 또는 파일 업로드만 가능)');
 }
 
 /**
@@ -305,7 +286,7 @@ async function confirmFeedbackConvert() {
   showFeedbackConvertConfirm.value = false;
 
   if (!examKey.value) {
-    alert('시험 정보가 없습니다.');
+    toast.warning('시험 정보가 없습니다.');
     return;
   }
 
@@ -321,9 +302,9 @@ async function confirmFeedbackConvert() {
 
     /* 피드백 탭으로 전환 */
     activeTab.value = 'feedback';
-    alert(msg);
+    toast.success(msg);
   } catch (error) {
-    alert(error.detail || '피드백 변환에 실패했습니다.');
+    toast.error(error.detail || '피드백 변환에 실패했습니다.');
   } finally {
     feedbackConverting.value = false;
   }
@@ -333,7 +314,7 @@ async function confirmFeedbackConvert() {
 function handleCopy() {
   if (!jsonText.value) return;
   navigator.clipboard.writeText(jsonText.value).then(() => {
-    alert('클립보드에 복사되었습니다.');
+    toast.success('클립보드에 복사되었습니다.');
   });
 }
 
@@ -352,7 +333,7 @@ function handleDownload() {
 /** 저장 버튼 클릭 → 확인 다이얼로그 표시 */
 function handleSave() {
   if (!jsonText.value) {
-    alert('변환된 JSON 데이터가 없습니다.');
+    toast.warning('변환된 JSON 데이터가 없습니다.');
     return;
   }
   showConfirm.value = true;
@@ -382,12 +363,12 @@ async function confirmSave() {
     try {
       items = JSON.parse(cleanJsonText(jsonText.value));
     } catch {
-      alert('JSON 형식이 올바르지 않습니다.');
+      toast.error('JSON 형식이 올바르지 않습니다.');
       return;
     }
 
     if (!Array.isArray(items)) {
-      alert('JSON이 배열 형식이 아닙니다.');
+      toast.error('JSON이 배열 형식이 아닙니다.');
       return;
     }
 
@@ -415,9 +396,9 @@ async function confirmSave() {
     }
 
     await bulkSave(examKey.value, { questions, instructions });
-    alert('저장되었습니다.');
+    toast.success('저장되었습니다.');
   } catch (error) {
-    alert(error.detail || '저장에 실패했습니다.');
+    toast.error(error.detail || '저장에 실패했습니다.');
   }
 }
 
@@ -466,73 +447,25 @@ function goBack() {
         <span>{{ statusMessage }}</span>
       </div>
       <div class="flex gap-2">
-        <!-- JSON 변환(문제) 드롭다운 버튼 -->
-        <div class="relative">
-          <button
-            class="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-            :disabled="converting || feedbackConverting"
-            @click.stop="showConvertMenu = !showConvertMenu; showFeedbackMenu = false"
-          >
-            {{ converting ? '변환 중...' : 'JSON 변환(문제)' }}
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <!-- 드롭다운 메뉴 -->
-          <div
-            v-if="showConvertMenu"
-            class="absolute right-0 z-10 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
-          >
-            <button
-              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
-              @click="handleConvertWithProvider('claude')"
-            >
-              <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
-              Claude
-            </button>
-            <button
-              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
-              @click="handleConvertWithProvider('gemini')"
-            >
-              <span class="inline-block h-2 w-2 rounded-full bg-blue-400"></span>
-              Gemini
-            </button>
-          </div>
-        </div>
+        <!-- JSON 변환(문제) 드롭다운 -->
+        <AiProviderDropdown
+          label="JSON 변환(문제)"
+          loading-label="변환 중..."
+          theme="blue"
+          :loading="converting"
+          :disabled="converting || feedbackConverting"
+          @select="handleConvertWithProvider"
+        />
 
-        <!-- JSON 변환(피드백) 드롭다운 버튼 -->
-        <div class="relative">
-          <button
-            class="inline-flex items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-4 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-            :disabled="feedbackConverting || converting || !jsonText"
-            @click.stop="showFeedbackMenu = !showFeedbackMenu; showConvertMenu = false"
-          >
-            {{ feedbackConverting ? '변환 중...' : 'JSON 변환(피드백)' }}
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <!-- 드롭다운 메뉴 -->
-          <div
-            v-if="showFeedbackMenu"
-            class="absolute right-0 z-10 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
-          >
-            <button
-              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50"
-              @click="handleFeedbackConvertWithProvider('claude')"
-            >
-              <span class="inline-block h-2 w-2 rounded-full bg-orange-400"></span>
-              Claude
-            </button>
-            <button
-              class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50"
-              @click="handleFeedbackConvertWithProvider('gemini')"
-            >
-              <span class="inline-block h-2 w-2 rounded-full bg-blue-400"></span>
-              Gemini
-            </button>
-          </div>
-        </div>
+        <!-- JSON 변환(피드백) 드롭다운 -->
+        <AiProviderDropdown
+          label="JSON 변환(피드백)"
+          loading-label="변환 중..."
+          theme="purple"
+          :loading="feedbackConverting"
+          :disabled="feedbackConverting || converting || !jsonText"
+          @select="handleFeedbackConvertWithProvider"
+        />
         <button
           class="rounded-md px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300"
           :disabled="!jsonText"

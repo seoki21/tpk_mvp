@@ -23,13 +23,13 @@ admin-web/
 │   ├── stores/           # Pinia 스토어 (도메인별 분리)
 │   ├── views/            # 페이지 단위 컴포넌트
 │   ├── components/       # 재사용 가능한 공통 컴포넌트
-│   │   ├── common/       # SearchBar, DataTable, Pagination, FormModal, ConfirmDialog
+│   │   ├── common/       # SearchBar, DataTable, Pagination, FormModal, ConfirmDialog, AppToast
 │   │   ├── layout/       # AdminLayout, AppHeader, AppSidebar
-│   │   ├── examList/     # ExamListFormModal, FilePopupMenu, PdfViewer
-│   │   ├── examQuestion/ # ExamConvertModal (기출문항 변환 팝업)
+│   │   ├── examList/     # ExamListFormModal, FilePopupMenu, FileUploadZone, PdfViewer
+│   │   ├── examQuestion/ # ExamInstructionCard, ExamQuestionCard, JsonEditorPanel, AiProviderDropdown
 │   │   ├── code/         # CodeFormModal
 │   │   └── groupCode/    # GroupCodeFormModal
-│   ├── composables/      # Vue 컴포저블 (재사용 로직)
+│   ├── composables/      # Vue 컴포저블 (useToast 등)
 │   └── api/              # API 호출 모듈
 ├── eslint.config.js      # ESLint v9 flat config
 ├── index.html
@@ -151,7 +151,17 @@ corepack pnpm run format      # Prettier 포매팅
     * SSE 프롬프트: `backend/app/prompts/pdf_convert.txt` 참조
     * '저장' 버튼 클릭시 '저장하시겠습니까?'라는 confirm 창을 출력하고 '예'를 선택하면 문제유형은 tb_exam_question 에 저장하고 지시문 유형은 tb_exam_instruction에 저장
 - 연습문제 관리
-- 문항구조 관리
+
+  - 구현 파일: `views/PracticeQuestionListView.vue`, `views/PracticeQuestionCreateView.vue`
+  - 현재 상태: **UI 껍데기만 구현** (API/Store 미연동)
+  - 목록 화면: 검색바(시험종류, 레벨, 영역, 상태) + 테이블(상태, 생성요청일시, 시험종류, 레벨, 영역) + 하단 문제목록(기출문제 관리와 동일 구조)
+  - 생성(API) 화면: 좌측 폼(시험종류, 레벨, 영역, 문항구조, 난이도, 문항수, 생성방법) + 우측 JSON 출력(구문강조)
+  - 화면예시
+
+    ![1774676019550](image/CLAUDE/1774676019550.png)
+  - 등록 화면 예시
+
+    ![1774675617831](image/CLAUDE/1774675617831.png)문항구조관리
 - 문항유형 관리
 - 그룹코드 관리
 
