@@ -117,9 +117,11 @@ def get_code(group_code: str, code: str) -> Optional[dict]:
 def create_code(data: dict, user: str = "admin") -> dict:
     """
     새로운 코드를 생성한다.
+    code 값이 없으면 해당 그룹코드 내 max(code)+1로 자동채번한다.
+    (삭제된 코드 포함하여 max 계산 — PK 충돌 방지)
 
     Args:
-        data: group_code, code, code_name, code_desc, sort_order를 포함한 딕셔너리
+        data: group_code, code(Optional), code_name, code_desc, sort_order를 포함한 딕셔너리
         user: 등록자 (추후 JWT 인증 연동 시 현재 사용자로 대체)
 
     Returns:
@@ -128,6 +130,20 @@ def create_code(data: dict, user: str = "admin") -> dict:
     conn = get_connection()
     try:
         cursor = conn.cursor()
+
+        # code 값이 없으면 해당 그룹코드 내 최대 code + 1로 자동채번
+        code_value = data.get("code")
+        if code_value is None:
+            cursor.execute(
+                """
+                SELECT COALESCE(MAX(code), 0) + 1 AS next_code
+                  FROM tb_code
+                 WHERE group_code = %s
+                """,
+                (data["group_code"],),
+            )
+            code_value = cursor.fetchone()["next_code"]
+
         # 코드 신규 등록 (del_yn 기본값 'N', 등록일시 현재시각)
         cursor.execute(
             """
@@ -136,7 +152,7 @@ def create_code(data: dict, user: str = "admin") -> dict:
             """,
             (
                 data["group_code"],
-                data["code"],
+                code_value,
                 data["code_name"],
                 data.get("code_desc"),
                 data.get("sort_order", 0),
@@ -145,7 +161,7 @@ def create_code(data: dict, user: str = "admin") -> dict:
         )
         conn.commit()
         # INSERT 후 포맷된 날짜를 포함한 결과를 조회하여 반환
-        return get_code(data["group_code"], data["code"])
+        return get_code(data["group_code"], code_value)
     except Exception:
         conn.rollback()
         raise

@@ -54,10 +54,11 @@ def get_code(group_code: str, code: int):
 def create_code(body: CodeCreate):
     """새로운 코드를 생성한다."""
     try:
-        # 중복 체크 (group_code + code 복합 PK)
-        existing = code_service.get_code(body.group_code, body.code)
-        if existing:
-            raise HTTPException(status_code=400, detail="이미 존재하는 코드입니다.")
+        # code가 명시적으로 전달된 경우에만 중복 체크 (자동채번 시에는 불필요)
+        if body.code is not None:
+            existing = code_service.get_code(body.group_code, body.code)
+            if existing:
+                raise HTTPException(status_code=400, detail="이미 존재하는 코드입니다.")
 
         row = code_service.create_code(body.model_dump())
         return BaseResponse(data=row, message="등록 성공")

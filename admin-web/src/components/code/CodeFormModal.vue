@@ -96,7 +96,9 @@ async function handleSave() {
         del_yn: form.value.del_yn
       });
     } else {
-      await codeStore.create(form.value);
+      /* 등록 모드: code는 서버에서 자동채번하므로 전송하지 않음 */
+      const { code, del_yn, ...createData } = form.value;
+      await codeStore.create(createData);
     }
     toast.success('저장되었습니다');
     emit('saved');
@@ -164,15 +166,14 @@ function cancelDelete() {
         />
       </div>
 
-      <!-- 코드 -->
-      <div class="flex items-center">
+      <!-- 코드 (수정 모드에서만 읽기전용 표시, 등록 모드에서는 서버 자동채번이므로 숨김) -->
+      <div v-if="isEditMode" class="flex items-center">
         <label class="w-28 shrink-0 text-sm font-medium text-gray-700"> 코드 </label>
         <input
-          v-model.number="form.code"
+          :value="form.code"
           type="number"
-          class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
-          :readonly="isEditMode"
-          :class="{ 'bg-gray-100': isEditMode }"
+          readonly
+          class="flex-1 rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm"
         />
       </div>
 

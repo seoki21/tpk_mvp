@@ -17,9 +17,9 @@ class CodeSearch(BaseModel):
 
 
 class CodeCreate(BaseModel):
-    """코드 생성 요청 스키마"""
+    """코드 생성 요청 스키마 — code는 서버에서 자동채번 (그룹 내 max+1)"""
     group_code: str = Field(..., max_length=20, description="그룹코드 (FK → tb_group_code)")
-    code: int = Field(..., description="코드 (integer)")
+    code: Optional[int] = Field(default=None, description="코드 (미입력 시 자동채번)")
     code_name: str = Field(..., max_length=100, description="코드명")
     code_desc: Optional[str] = Field(None, max_length=500, description="코드 설명")
     sort_order: Optional[int] = Field(0, description="정렬순서")
