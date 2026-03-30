@@ -21,6 +21,7 @@ defineProps({
 
 /* 메뉴 항목 정의 — 아이콘 + 라벨 + 경로, separator로 구분선 표시 */
 const menuItems = [
+  { icon: '📊', label: '대시보드', path: '/' },
   { icon: '👤', label: '사용자 관리', path: '/users' },
   { icon: '📝', label: '시험관리(기출)', path: '/exam-questions' },
   { icon: '📄', label: '기출문제 관리', path: '/past-exam-questions' },

@@ -96,15 +96,15 @@ function parseFeedback(fb) {
     </div>
   </div>
 
-  <!-- MP3 플레이어 영역 -->
+  <!-- MP3 플레이어 영역 — v-show로 DOM 유지하여 audio 요소 재생성 방지 -->
   <div class="mb-3">
-    <div v-if="mp3Url" class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
-      <audio controls preload="none" class="h-8 w-full" :src="mp3Url">
+    <div v-show="mp3Url" class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+      <audio controls preload="none" class="h-8 w-full" :src="mp3Url || ''">
         브라우저에서 오디오를 지원하지 않습니다.
       </audio>
     </div>
     <!-- MP3 파일 없음 — 비활성 플레이어 -->
-    <div v-else class="flex items-center gap-2 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-gray-400">
+    <div v-show="!mp3Url" class="flex items-center gap-2 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-gray-400">
       <!-- 음소거 아이콘 -->
       <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-3.15a.75.75 0 011.28.53v13.74a.75.75 0 01-1.28.53L6.75 14.25H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
