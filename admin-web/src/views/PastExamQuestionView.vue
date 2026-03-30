@@ -5,7 +5,7 @@
   - 마운트 시 기출문제 목록을 조회한다.
 -->
 <script setup>
-import { onMounted, ref, reactive, watch } from 'vue';
+import { onMounted, ref, reactive, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
 import { bulkSave, generateFeedback, generateFeedbackSingle, updateQuestionSingle } from '@/api/examQuestion';
@@ -145,10 +145,53 @@ function getActiveJsonError(item) {
 }
 
 
-/** 시험 선택 변경 */
+/* ========== 영역 필터 ========== */
+
+/**
+ * 선택된 시험과 같은 (year, round, tpk_level)을 가진 시험들의 영역 목록을 반환한다.
+ * 기출문제 selectbox 선택 시 → 영역 selectbox 필터링에 사용.
+ */
+const sectionOptionsForExam = computed(() => {
+  const exam = store.selectedExam;
+  if (!exam) return [];
+  /* 같은 (year, round, tpk_level) 그룹에 속하는 시험들의 영역 추출 */
+  const siblings = store.examOptions.filter(
+    (e) => e.exam_year === exam.exam_year && e.round === exam.round && e.tpk_level === exam.tpk_level
+  );
+  /* 중복 제거된 영역 목록 반환 */
+  const seen = new Set();
+  return siblings
+    .filter((e) => {
+      if (seen.has(e.section)) return false;
+      seen.add(e.section);
+      return true;
+    })
+    .map((e) => ({ code: e.section, name: e.section_name }));
+});
+
+/** 시험 선택 변경 — 선택된 시험의 파일(PDF) 목록 로드 */
 async function handleExamChange(event) {
   const examKey = event.target.value ? Number(event.target.value) : null;
   await store.selectExam(examKey);
+}
+
+/** 영역 선택 변경 — 같은 그룹 내 해당 영역의 exam_key로 전환 후 파일 로드 */
+async function handleSectionChange(event) {
+  const sectionCode = event.target.value || null;
+  if (!sectionCode || !store.selectedExam) return;
+
+  const currentExam = store.selectedExam;
+  /* 같은 (year, round, tpk_level) + 선택한 영역에 해당하는 시험 찾기 */
+  const targetExam = store.examOptions.find(
+    (e) =>
+      e.exam_year === currentExam.exam_year &&
+      e.round === currentExam.round &&
+      e.tpk_level === currentExam.tpk_level &&
+      e.section === sectionCode
+  );
+  if (targetExam && targetExam.exam_key !== store.selectedExamKey) {
+    await store.selectExam(targetExam.exam_key);
+  }
 }
 
 /** 파일 선택 변경 — 선택 후 문제/지시문 재조회 */
@@ -347,7 +390,6 @@ function getExamLabel(exam) {
   if (exam.exam_year) parts.push(exam.exam_year + '년');
   if (exam.round) parts.push('제' + exam.round + '회');
   if (exam.tpk_level_name) parts.push(exam.tpk_level_name);
-  if (exam.section_name) parts.push(exam.section_name);
   return parts.join(' ') || `시험 ${exam.exam_key}`;
 }
 
@@ -520,9 +562,25 @@ onMounted(() => {
         </template>
       </div>
 
-      <!-- 파일 selectbox -->
+      <!-- 영역 selectbox -->
       <div class="flex items-center gap-2">
-        <label class="whitespace-nowrap text-sm font-medium text-gray-700">파일</label>
+        <label class="whitespace-nowrap text-sm font-medium text-gray-700">영역</label>
+        <select
+          :value="store.selectedExam?.section || ''"
+          class="min-w-[120px] rounded border border-gray-300 px-3 py-1.5 text-sm"
+          :disabled="!store.selectedExamKey"
+          @change="handleSectionChange"
+        >
+          <option value="">선택하세요</option>
+          <option v-for="sec in sectionOptionsForExam" :key="sec.code" :value="sec.code">
+            {{ sec.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 파일(PDF) selectbox -->
+      <div class="flex items-center gap-2">
+        <label class="whitespace-nowrap text-sm font-medium text-gray-700">파일(PDF)</label>
         <select
           :value="store.selectedPdfKey || ''"
           class="min-w-[200px] rounded border border-gray-300 px-3 py-1.5 text-sm"

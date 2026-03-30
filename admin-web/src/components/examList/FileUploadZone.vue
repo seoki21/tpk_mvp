@@ -13,6 +13,11 @@ const props = defineProps({
     type: String,
     default: 'PDF'
   },
+  /** 영역 표시 라벨 (예: '문제(PDF)', '듣기(MP3)') — 미지정 시 '문제({fileTypeLabel})' */
+  sectionLabel: {
+    type: String,
+    default: ''
+  },
   /** 파일 accept 속성 (예: '.pdf', '.json') */
   accept: {
     type: String,
@@ -104,26 +109,29 @@ function formatFileSize(bytes) {
 /** 라벨 색상 클래스 */
 const labelColorClass = {
   blue: 'text-red-500',
-  teal: 'text-teal-600'
+  teal: 'text-teal-600',
+  purple: 'text-purple-600'
 };
 
 /** 버튼 색상 클래스 */
 const btnColorClass = {
   blue: 'bg-blue-500 hover:bg-blue-600',
-  teal: 'bg-teal-500 hover:bg-teal-600'
+  teal: 'bg-teal-500 hover:bg-teal-600',
+  purple: 'bg-purple-500 hover:bg-purple-600'
 };
 
 /** 드래그 활성 색상 클래스 */
 const dragColorClass = {
   blue: 'border-blue-400 bg-blue-50 text-blue-500',
-  teal: 'border-teal-400 bg-teal-50 text-teal-500'
+  teal: 'border-teal-400 bg-teal-50 text-teal-500',
+  purple: 'border-purple-400 bg-purple-50 text-purple-500'
 };
 </script>
 
 <template>
   <div class="border-t border-gray-200 pt-4">
     <div class="mb-3 flex items-center justify-between">
-      <label class="text-sm font-medium text-gray-700">문제({{ fileTypeLabel }})</label>
+      <label class="text-sm font-medium text-gray-700">{{ sectionLabel || `문제(${fileTypeLabel})` }}</label>
       <button
         type="button"
         class="rounded px-3 py-1.5 text-xs text-white"
@@ -137,7 +145,7 @@ const dragColorClass = {
         ref="fileInput"
         type="file"
         multiple
-        :accept="accept"
+        :accept="accept === '*/*' ? undefined : accept"
         class="hidden"
         @change="handleFileChange"
       />
@@ -145,7 +153,7 @@ const dragColorClass = {
 
     <!-- 드래그앤드롭 영역 -->
     <div
-      class="flex min-h-[100px] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors"
+      class="flex max-h-[200px] min-h-[100px] items-center justify-center overflow-y-auto rounded-lg border-2 border-dashed p-4 text-center transition-colors"
       :class="
         !enabled
           ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'

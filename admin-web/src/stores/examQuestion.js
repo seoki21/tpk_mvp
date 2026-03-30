@@ -135,7 +135,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
   async function fetchFileOptions(examKey) {
     try {
       const res = await getFiles(examKey);
-      fileOptions.value = res.data || [];
+      const allFiles = res.data || [];
+      /* file_type이 'pdf' 이거나 NULL인 파일만 표시 */
+      fileOptions.value = allFiles.filter((f) => !f.file_type || f.file_type === 'pdf');
     } catch (error) {
       console.error('[ExamQuestion Store] fetchFileOptions 실패:', error);
       fileOptions.value = [];

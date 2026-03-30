@@ -31,6 +31,7 @@ export const useExamListStore = defineStore('examList', () => {
   const searchParams = reactive({
     exam_type: '',
     tpk_level: '',
+    section: '',
     round: ''
   });
 

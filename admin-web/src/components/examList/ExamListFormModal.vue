@@ -72,6 +72,14 @@ const pendingJsonFiles = ref([]);
 /** JSON 파일 업로드 로딩 상태 */
 const jsonFileLoading = ref(false);
 
+/* ========== MP3 파일 관련 상태 ========== */
+/** 서버에 업로드된 MP3 파일 목록 (수정 모드) */
+const mp3FileList = ref([]);
+/** 등록 모드에서 대기 중인 MP3 파일 (저장 시 업로드) */
+const pendingMp3Files = ref([]);
+/** MP3 파일 업로드 로딩 상태 */
+const mp3FileLoading = ref(false);
+
 /** 모달이 열릴 때 폼 데이터를 초기화 */
 watch(
   () => props.visible,
@@ -79,6 +87,7 @@ watch(
     if (newVal) {
       pendingFiles.value = [];
       pendingJsonFiles.value = [];
+      pendingMp3Files.value = [];
 
       if (props.editData) {
         /* 수정 모드: 기존 데이터를 폼에 채움 */
@@ -106,6 +115,7 @@ watch(
         };
         fileList.value = [];
         jsonFileList.value = [];
+        mp3FileList.value = [];
       }
 
       /* 코드 옵션이 비어 있으면 가져옴 */
@@ -127,10 +137,12 @@ async function loadFiles() {
     /* file_type별 분리 (NULL이면 pdf로 취급) */
     fileList.value = allFiles.filter((f) => !f.file_type || f.file_type === 'pdf');
     jsonFileList.value = allFiles.filter((f) => f.file_type === 'json');
+    mp3FileList.value = allFiles.filter((f) => f.file_type === 'mp3');
   } catch (error) {
     console.error('[FILE] 목록 조회 실패:', error);
     fileList.value = [];
     jsonFileList.value = [];
+    mp3FileList.value = [];
   }
 }
 
@@ -144,11 +156,16 @@ function validatePdfFiles(files) {
   return true;
 }
 
-/** JSON 파일 유효성 검증 — 실패 시 false 반환 */
-function validateJsonFiles(files) {
-  const invalidFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.json'));
+/** JSON 파일 유효성 검증 — 확장자 체크 없이 항상 통과 */
+function validateJsonFiles() {
+  return true;
+}
+
+/** MP3 파일 유효성 검증 — 실패 시 false 반환 */
+function validateMp3Files(files) {
+  const invalidFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.mp3'));
   if (invalidFiles.length > 0) {
-    toast.warning('JSON 파일 형식이 아닌 것 같으니 확인 바랍니다.');
+    toast.warning('듣기 파일 형식이 MP3가 아닌 것 같으니 확인 바랍니다.');
     return false;
   }
   return true;
@@ -180,6 +197,11 @@ async function handleJsonFileSelect(files) {
   await handleFileSelect(files, 'json', validateJsonFiles, pendingJsonFiles);
 }
 
+/** MP3 파일 선택/드롭 핸들러 */
+async function handleMp3FileSelect(files) {
+  await handleFileSelect(files, 'mp3', validateMp3Files, pendingMp3Files);
+}
+
 /** 대기 PDF 파일 제거 (등록 모드) */
 function removePendingFile(index) {
   pendingFiles.value.splice(index, 1);
@@ -190,9 +212,21 @@ function removePendingJsonFile(index) {
   pendingJsonFiles.value.splice(index, 1);
 }
 
+/** 대기 MP3 파일 제거 (등록 모드) */
+function removePendingMp3File(index) {
+  pendingMp3Files.value.splice(index, 1);
+}
+
+/** 파일 유형별 로딩 ref 반환 */
+function getLoadingRef(fileType) {
+  if (fileType === 'json') return jsonFileLoading;
+  if (fileType === 'mp3') return mp3FileLoading;
+  return fileLoading;
+}
+
 /** 서버에 파일 업로드 실행 (수정 모드에서 사용) */
 async function doUpload(files, fileType = 'pdf') {
-  const loadingRef = fileType === 'json' ? jsonFileLoading : fileLoading;
+  const loadingRef = getLoadingRef(fileType);
   loadingRef.value = true;
   try {
     await uploadFiles(form.value.exam_key, files, fileType);
@@ -275,6 +309,18 @@ async function handleSave() {
       }
     }
 
+    /* 등록 모드에서 pendingMp3Files(MP3)가 있으면 업로드 */
+    if (pendingMp3Files.value.length > 0 && examKey) {
+      mp3FileLoading.value = true;
+      try {
+        await uploadFiles(examKey, pendingMp3Files.value, 'mp3');
+      } catch (uploadError) {
+        toast.error(uploadError.detail || 'MP3 파일 업로드 중 오류가 발생했습니다');
+      } finally {
+        mp3FileLoading.value = false;
+      }
+    }
+
     toast.success('저장되었습니다');
     emit('saved');
   } catch (error) {
@@ -346,7 +392,7 @@ function cancelDelete() {
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value=""></option>
-          <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="opt.code">
+          <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
         </select>
@@ -360,7 +406,7 @@ function cancelDelete() {
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value=""></option>
-          <option v-for="opt in store.tpkLevelOptions" :key="opt.code" :value="opt.code">
+          <option v-for="opt in store.tpkLevelOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
         </select>
@@ -384,7 +430,7 @@ function cancelDelete() {
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         >
           <option value=""></option>
-          <option v-for="opt in store.sectionOptions" :key="opt.code" :value="opt.code">
+          <option v-for="opt in store.sectionOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
         </select>
@@ -430,7 +476,7 @@ function cancelDelete() {
       <!-- 문제(JSON) 파일 영역 -->
       <FileUploadZone
         file-type-label="JSON"
-        accept=".json"
+        accept="*/*"
         accent-color="teal"
         :is-edit-mode="isEditMode"
         :enabled="isPastExamType"
@@ -440,6 +486,32 @@ function cancelDelete() {
         @file-select="handleJsonFileSelect"
         @file-delete="handleFileDelete"
         @pending-remove="removePendingJsonFile"
+      >
+        <template #file-link="{ file }">
+          <a
+            :href="getFileDownloadUrl(file)"
+            class="truncate text-sm text-blue-600 hover:underline"
+            target="_blank"
+          >
+            {{ file.file_name }}
+          </a>
+        </template>
+      </FileUploadZone>
+
+      <!-- 듣기(MP3) 파일 영역 -->
+      <FileUploadZone
+        file-type-label="MP3"
+        section-label="듣기(MP3)"
+        accept=".mp3"
+        accent-color="purple"
+        :is-edit-mode="isEditMode"
+        :enabled="isPastExamType"
+        :file-list="mp3FileList"
+        :pending-files="pendingMp3Files"
+        :loading="mp3FileLoading"
+        @file-select="handleMp3FileSelect"
+        @file-delete="handleFileDelete"
+        @pending-remove="removePendingMp3File"
       >
         <template #file-link="{ file }">
           <a

@@ -27,6 +27,7 @@ const columns = [
   { key: 'section_name', label: '영역', width: '140px', align: 'left' },
   { key: 'has_pdf', label: '문제(PDF)', width: '80px', sortable: false },
   { key: 'has_json', label: '문제(JSON)', width: '80px', sortable: false },
+  { key: 'mp3_count', label: '듣기(MP3)', width: '80px', sortable: false },
   { key: 'del_yn', label: '삭제여부', width: '100px' },
   { key: 'ins_user', label: '생성자', width: '120px' },
   { key: 'ins_date', label: '생성시간', width: '180px' }
@@ -93,13 +94,21 @@ function handlePageSizeChange(newSize) {
 }
 
 /**
- * FILE 컬럼 'Y' 클릭 — 파일 목록 팝업 표시
- * row-click(모달 열기)이 발생하지 않도록 @click.stop 으로 전파 차단
+ * 파일 컬럼 클릭 — 해당 file_type의 파일 목록만 팝업 표시
+ * @param {Object} row - 테이블 행 데이터
+ * @param {Event} event - 클릭 이벤트 (팝업 위치 계산용)
+ * @param {string} fileType - 'pdf', 'json', 'mp3'
  */
-async function handleFileClick(row, event) {
+async function handleFileClick(row, event, fileType) {
   try {
     const res = await getFiles(row.exam_key);
-    fileList.value = res.data || [];
+    const allFiles = res.data || [];
+    /* file_type별 필터링 (NULL이면 pdf로 취급) */
+    if (fileType === 'pdf') {
+      fileList.value = allFiles.filter((f) => !f.file_type || f.file_type === 'pdf');
+    } else {
+      fileList.value = allFiles.filter((f) => f.file_type === fileType);
+    }
   } catch (error) {
     console.error('[FILE] 파일 목록 조회 실패:', error);
     fileList.value = [];
@@ -144,7 +153,7 @@ onMounted(() => {
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
           <option value=""></option>
-          <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="opt.code">
+          <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
         </select>
@@ -158,7 +167,21 @@ onMounted(() => {
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
           <option value=""></option>
-          <option v-for="opt in store.tpkLevelOptions" :key="opt.code" :value="opt.code">
+          <option v-for="opt in store.tpkLevelOptions" :key="opt.code" :value="String(opt.code)">
+            {{ opt.code_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 영역 셀렉트박스 -->
+      <div class="flex items-center gap-2">
+        <label class="whitespace-nowrap text-sm font-medium text-gray-700"> 영역 </label>
+        <select
+          v-model="store.searchParams.section"
+          class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
+        >
+          <option value=""></option>
+          <option v-for="opt in store.sectionOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
         </select>
@@ -186,24 +209,15 @@ onMounted(() => {
       @row-click="handleRowClick"
       @update:page-size="handlePageSizeChange"
     >
-      <!-- 문제(PDF) 컬럼: Y이면 파일 아이콘, 아니면 공백 -->
+      <!-- 문제(PDF) 컬럼: Y이면 파일 아이콘, 클릭 시 팝업 -->
       <template #cell-has_pdf="{ row, value }">
         <span
           v-if="value === 'Y'"
           class="cursor-pointer text-blue-600 hover:text-blue-800"
           title="PDF 파일 보기"
-          @click.stop="handleFileClick(row, $event)"
+          @click.stop="handleFileClick(row, $event, 'pdf')"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="mx-auto h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />
@@ -213,24 +227,33 @@ onMounted(() => {
         <span v-else></span>
       </template>
 
-      <!-- 문제(JSON) 컬럼: Y이면 파일 아이콘, 아니면 공백 -->
-      <template #cell-has_json="{ value }">
-        <span v-if="value === 'Y'" class="text-teal-600" title="JSON 파일 있음">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="mx-auto h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+      <!-- 문제(JSON) 컬럼: Y이면 파일 아이콘 -->
+      <template #cell-has_json="{ row, value }">
+        <span
+          v-if="value === 'Y'"
+          class="cursor-pointer text-teal-600 hover:text-teal-800"
+          title="JSON 파일 보기"
+          @click.stop="handleFileClick(row, $event, 'json')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
           </svg>
+        </span>
+        <span v-else></span>
+      </template>
+
+      <!-- 듣기(MP3) 컬럼: 건수 표시, 클릭 시 팝업 -->
+      <template #cell-mp3_count="{ row, value }">
+        <span
+          v-if="value > 0"
+          class="cursor-pointer text-sm text-purple-600 hover:text-purple-800 hover:underline"
+          :title="`MP3 파일 ${value}건`"
+          @click.stop="handleFileClick(row, $event, 'mp3')"
+        >
+          {{ value }}건
         </span>
         <span v-else></span>
       </template>

@@ -49,18 +49,21 @@ async def upload_files(
     파일을 업로드한다. (여러 파일 동시 업로드 가능)
     - file_type='pdf': PDF 파일만 허용
     - file_type='json': JSON 파일만 허용
+    - file_type='mp3': MP3 파일만 허용
     """
     try:
         _check_exam_exists(exam_key)
 
-        # file_type에 따른 파일 유효성 검증
+        # file_type에 따른 파일 유효성 검증 (json은 확장자 체크 없음)
         for file in files:
             fname = file.filename.lower()
             if file_type == "json":
-                if not fname.endswith(".json"):
+                pass  # JSON 영역은 확장자 체크하지 않음
+            elif file_type == "mp3":
+                if not fname.endswith(".mp3"):
                     raise HTTPException(
                         status_code=400,
-                        detail="JSON 파일 형식이 아닌 것 같으니 확인 바랍니다."
+                        detail="듣기 파일 형식이 MP3가 아닌 것 같으니 확인 바랍니다."
                     )
             else:
                 # 기본: PDF 검증
@@ -120,7 +123,13 @@ def download_file(exam_key: int, pdf_key: int, inline: bool = False):
             raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
 
         # 파일 유형에 따른 media_type 결정
-        media = "application/json" if file_info.get("file_type") == "json" else "application/pdf"
+        file_type_val = file_info.get("file_type")
+        if file_type_val == "json":
+            media = "application/json"
+        elif file_type_val == "mp3":
+            media = "audio/mpeg"
+        else:
+            media = "application/pdf"
 
         # 원본 파일명으로 응답 (inline 여부에 따라 Content-Disposition 결정)
         return FileResponse(

@@ -20,7 +20,9 @@ _BASE_SELECT = """
            (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
               FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND (ef.file_type = 'pdf' OR ef.file_type IS NULL)) AS has_pdf,
            (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
-              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'json') AS has_json
+              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'json') AS has_json,
+           (SELECT COUNT(*)
+              FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'mp3') AS mp3_count
       FROM tb_exam_list e
       LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(e.exam_type AS INTEGER)
       LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.tpk_level AS INTEGER)
@@ -31,17 +33,19 @@ _BASE_SELECT = """
 def list_exam_list(
     exam_type: Optional[str] = None,
     tpk_level: Optional[str] = None,
+    section: Optional[str] = None,
     round: Optional[int] = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[dict], int]:
     """
     시험문항 목록을 페이지네이션하여 조회한다.
-    검색 조건(exam_type, tpk_level, round)은 정확 일치로 동적 적용된다.
+    검색 조건(exam_type, tpk_level, section, round)은 정확 일치로 동적 적용된다.
 
     Args:
         exam_type: 시험유형 코드 (정확 일치)
         tpk_level: 토픽레벨 코드 (정확 일치)
+        section: 영역 코드 (정확 일치)
         round: 회차 (정수 정확 일치)
         page: 페이지 번호
         size: 페이지당 항목 수
@@ -63,6 +67,9 @@ def list_exam_list(
         if tpk_level:
             conditions.append("e.tpk_level = %s")
             params.append(tpk_level)
+        if section:
+            conditions.append("e.section = %s")
+            params.append(section)
         if round is not None:
             conditions.append("e.round = %s")
             params.append(round)
@@ -76,12 +83,12 @@ def list_exam_list(
         cursor.execute(count_sql, tuple(params))
         total = cursor.fetchone()["total"]
 
-        # 페이지네이션 적용하여 목록 조회 (삭제여부 오름차순 → 시험연도 내림차순 → 시험유형 오름차순 → 회차 오름차순)
+        # 페이지네이션 적용하여 목록 조회 (삭제여부 오름차순 → 생성시간 내림차순)
         limit, offset = get_limit_offset(page, size)
         list_sql = f"""
             {_BASE_SELECT}
             {where_clause}
-            ORDER BY e.del_yn ASC, e.exam_year DESC, e.exam_type ASC, e.round ASC
+            ORDER BY e.del_yn ASC, e.ins_date DESC
             LIMIT %s OFFSET %s
         """
         cursor.execute(list_sql, tuple(params) + (limit, offset))

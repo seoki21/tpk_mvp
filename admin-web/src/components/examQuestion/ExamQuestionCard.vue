@@ -57,9 +57,13 @@ function getActiveFeedbackList() {
   return tab ? tab.list : [];
 }
 
+/** 동그라미 번호(①②③④) → 숫자 매핑 */
+const circleNumMap = { '①': 1, '②': 2, '③': 3, '④': 4, '⑤': 5, '⑥': 6, '⑦': 7, '⑧': 8, '⑨': 9 };
+
 /**
  * 피드백 문자열 파싱
- * "①:T_정답 설명" → { label: "①", isCorrect: true, text: "정답 설명" }
+ * "①:T_정답 설명" → { label: "①", isCorrect: true/false, text: "정답 설명" }
+ * 정답 판단: T/F 문자가 아닌 라벨의 동그라미 번호와 correctAnswer를 비교하여 판단한다.
  */
 function parseFeedback(fb) {
   if (!fb || typeof fb !== 'string') return { label: '', isCorrect: false, text: fb || '' };
@@ -67,29 +71,22 @@ function parseFeedback(fb) {
   if (colonIdx === -1) return { label: '', isCorrect: false, text: fb };
   const label = fb.substring(0, colonIdx);
   const rest = fb.substring(colonIdx + 1);
-  const isCorrect = rest.startsWith('T');
+  /* T/F 접두어 또는 _ 구분자를 건너뛰고 실제 피드백 텍스트만 추출 */
   const underscoreIdx = rest.indexOf('_');
   const text = underscoreIdx !== -1 ? rest.substring(underscoreIdx + 1) : rest;
+  /* 라벨의 동그라미 번호와 correctAnswer 비교로 정답 여부 판단 */
+  const labelNum = circleNumMap[label.trim()];
+  const isCorrect = labelNum != null && labelNum === Number(props.correctAnswer);
   return { label, isCorrect, text };
 }
 </script>
 
 <template>
-  <!-- 상단: {no}번(정답 색상) {section} {type} {score}점 -->
+  <!-- 상단: {no}번 {section} {type} {score}점 -->
   <div class="mb-3 border-b border-gray-200 pb-2">
     <div class="flex items-baseline gap-2 text-sm">
-      <span
-        class="font-bold"
-        :class="
-          correctAnswer
-            ? 'rounded bg-blue-600 px-1.5 py-0.5 text-white'
-            : 'text-gray-800'
-        "
-      >
+      <span class="font-bold text-gray-800">
         {{ item.question_no }}번
-        <template v-if="correctAnswer">
-          (정답: {{ correctAnswer }})
-        </template>
       </span>
       <span
         v-if="parsed && parsed.section"
@@ -131,7 +128,7 @@ function parseFeedback(fb) {
     >
       {{ item.question_no }}. {{ parsed.question_text }}
     </p>
-    <!-- 선택지 -->
+    <!-- 선택지 (정답 번호와 일치하는 선택지는 피드백 정답과 동일 스타일 적용) -->
     <div
       v-if="parsed.choices"
       class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
@@ -139,7 +136,7 @@ function parseFeedback(fb) {
       <span
         v-for="(choice, ci) in parsed.choices"
         :key="ci"
-        class="text-gray-700"
+        :class="ci + 1 === Number(correctAnswer) ? 'font-medium text-blue-700' : 'text-gray-700'"
       >
         {{ choice }}
       </span>

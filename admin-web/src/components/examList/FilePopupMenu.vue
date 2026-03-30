@@ -73,15 +73,14 @@ function handleSelect(file) {
         left: anchorRect.left + 'px'
       }"
     >
-      <!-- 파일 목록 -->
-      <div v-if="files.length > 0">
+      <!-- 파일 목록 (200px 초과 시 스크롤) -->
+      <div v-if="files.length > 0" class="max-h-[200px] overflow-y-auto">
         <button
           v-for="file in files"
           :key="file.pdf_key"
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
           @click="handleSelect(file)"
         >
-          <span class="shrink-0 text-xs text-red-500">PDF</span>
           <span class="truncate">{{ file.file_name }}</span>
         </button>
       </div>
