@@ -25,6 +25,50 @@ conn = psycopg.connect(DATABASE_URL, autocommit=False)
 cur = conn.cursor()
 
 sqls = [
+    # 0-1. tb_admin : 관리자
+    """
+    CREATE TABLE IF NOT EXISTS tb_admin (
+        admin_id    VARCHAR(50)   NOT NULL,
+        password    VARCHAR(255)  NOT NULL,
+        admin_desc  VARCHAR(200),
+        del_yn      VARCHAR(1)    NOT NULL DEFAULT 'N',
+        ins_date    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user    VARCHAR(50)   NOT NULL DEFAULT 'admin',
+        upd_date    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        upd_user    VARCHAR(50)   NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_admin PRIMARY KEY (admin_id)
+    )
+    """,
+
+    # 0-2. tb_api_usage : API 사용 이력
+    """
+    CREATE TABLE IF NOT EXISTS tb_api_usage (
+        usage_key     SERIAL        NOT NULL,
+        admin_id      VARCHAR(50)   NOT NULL,
+        api_type      VARCHAR(30)   NOT NULL,
+        ai_provider   VARCHAR(20)   NOT NULL,
+        model_name    VARCHAR(50),
+        input_tokens  INTEGER       DEFAULT 0,
+        output_tokens INTEGER       DEFAULT 0,
+        cost_usd      NUMERIC(10,6) DEFAULT 0,
+        exam_key      INTEGER,
+        ins_date      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT pk_api_usage PRIMARY KEY (usage_key)
+    )
+    """,
+
+    # 0-3. tb_admin_role : 관리자 권한
+    """
+    CREATE TABLE IF NOT EXISTS tb_admin_role (
+        role_key    SERIAL        NOT NULL,
+        admin_id    VARCHAR(50)   NOT NULL,
+        role_code   VARCHAR(20)   NOT NULL,
+        ins_date    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT pk_admin_role PRIMARY KEY (role_key),
+        CONSTRAINT fk_admin_role_admin FOREIGN KEY (admin_id) REFERENCES tb_admin(admin_id)
+    )
+    """,
+
     # 1. tb_user : 사용자
     """
     CREATE TABLE tb_user (

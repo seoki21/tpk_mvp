@@ -3,16 +3,18 @@
 tb_group_code 테이블에 대한 CRUD 엔드포인트를 정의한다.
 URL 접두사: /api/v1/group-codes
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 
 from app.models.common import BaseResponse, PaginatedResponse
 from app.models.group_code import GroupCodeCreate, GroupCodeUpdate
 from app.services import group_code as group_code_service
+from app.utils.auth import get_current_admin
 
 router = APIRouter(
     prefix="/api/v1/group-codes",
     tags=["그룹코드"],
+    dependencies=[Depends(get_current_admin)],
 )
 
 

@@ -12,6 +12,7 @@ from app.config import (
     GOOGLE_AI_API_KEY, GOOGLE_AI_MODEL,
 )
 from app.database import get_connection
+from app.services.api_usage import save_usage
 
 
 # Anthropic 클라이언트 싱글턴
@@ -256,6 +257,13 @@ def _generate_feedback_claude(question_json: str) -> str:
         ],
     )
 
+    # API 사용 이력 저장
+    try:
+        save_usage("admin", "feedback_generate", "claude", ANTHROPIC_MODEL,
+                   response.usage.input_tokens, response.usage.output_tokens)
+    except Exception:
+        pass
+
     # 응답 텍스트 추출
     result_text = ""
     for block in response.content:
@@ -282,6 +290,14 @@ def _generate_feedback_gemini(question_json: str) -> str:
         model=GOOGLE_AI_MODEL,
         contents=prompt,
     )
+
+    # API 사용 이력 저장
+    try:
+        in_tok = response.usage_metadata.prompt_token_count or 0
+        out_tok = response.usage_metadata.candidates_token_count or 0
+        save_usage("admin", "feedback_generate", "gemini", GOOGLE_AI_MODEL, in_tok, out_tok)
+    except Exception:
+        pass
 
     return _extract_json_from_response(response.text)
 

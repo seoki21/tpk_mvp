@@ -16,6 +16,7 @@ from app.config import (
     UPLOAD_DIR,
 )
 from app.services.exam_file import get_file
+from app.services.api_usage import save_usage
 
 
 # Anthropic 비동기 클라이언트 싱글턴
@@ -150,13 +151,17 @@ async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerato
 
             # 최종 메시지에서 토큰 사용량 및 중단 사유 추출
             response = await stream.get_final_message()
+            in_tok = response.usage.input_tokens
+            out_tok = response.usage.output_tokens
             yield _format_sse("done", {
                 "stop_reason": response.stop_reason,
-                "token_usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                },
+                "token_usage": {"input_tokens": in_tok, "output_tokens": out_tok},
             })
+            # API 사용 이력 저장
+            try:
+                save_usage("admin", "pdf_convert", "claude", ANTHROPIC_MODEL, in_tok, out_tok)
+            except Exception:
+                pass  # 이력 저장 실패가 변환 결과에 영향을 주지 않도록 무시
 
     except anthropic.RateLimitError:
         yield _format_sse("error", {"detail": "AI API 요청 한도 초과. 잠시 후 다시 시도해 주세요."})
@@ -224,6 +229,11 @@ async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerato
                 "output_tokens": output_tokens,
             },
         })
+        # API 사용 이력 저장
+        try:
+            save_usage("admin", "pdf_convert", "gemini", GOOGLE_AI_MODEL, input_tokens, output_tokens)
+        except Exception:
+            pass
 
     except Exception as e:
         yield _format_sse("error", {"detail": f"PDF 변환 실패: {str(e)}"})

@@ -3,16 +3,18 @@
 tb_code 테이블에 대한 CRUD 엔드포인트를 정의한다.
 URL 접두사: /api/v1/codes
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 
 from app.models.common import BaseResponse, PaginatedResponse
 from app.models.code import CodeCreate, CodeUpdate
 from app.services import code as code_service
+from app.utils.auth import get_current_admin
 
 router = APIRouter(
     prefix="/api/v1/codes",
     tags=["코드"],
+    dependencies=[Depends(get_current_admin)],
 )
 
 

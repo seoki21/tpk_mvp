@@ -3,14 +3,16 @@
 tb_exam_question, tb_exam_instruction 테이블에 대한 CRUD 엔드포인트를 정의한다.
 URL 접두사: /api/v1/exam-list/{exam_key}/questions
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.common import BaseResponse
 from app.models.exam_question import ExamQuestionBulkSave
 from app.services import exam_question as exam_question_service
+from app.utils.auth import get_current_admin
 
 router = APIRouter(
     prefix="/api/v1/exam-list/{exam_key}/questions",
     tags=["기출문제 관리"],
+    dependencies=[Depends(get_current_admin)],
 )
 
 

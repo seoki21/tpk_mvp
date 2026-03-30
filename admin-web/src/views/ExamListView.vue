@@ -139,7 +139,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex h-full flex-col">
     <!-- 서브 타이틀 -->
     <h2 class="mb-4 text-xl font-bold text-gray-800">시험관리(기출)</h2>
 
@@ -267,8 +267,8 @@ onMounted(() => {
       @update:page="handlePageChange"
     />
 
-    <!-- PDF 파일보기 영역 -->
-    <PdfViewer :url="pdfUrl" :file-name="pdfFileName" class="mt-4" />
+    <!-- PDF 파일보기 영역 — 남은 높이를 모두 사용 -->
+    <PdfViewer :url="pdfUrl" :file-name="pdfFileName" class="mt-4 min-h-0 flex-1" />
 
     <!-- 파일 목록 팝업 메뉴 -->
     <FilePopupMenu

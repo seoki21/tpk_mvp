@@ -1,33 +1,31 @@
 /**
  * 관리자 웹 라우터 정의
- * AdminLayout을 부모 라우트로 사용하고, 각 페이지를 children으로 배치한다.
- * 아직 미구현된 페이지는 DashboardView를 placeholder로 사용한다.
+ * - AdminLayout을 부모 라우트로 사용하고, 각 페이지를 children으로 배치한다.
+ * - 로그인 페이지는 AdminLayout 밖에 배치한다.
+ * - beforeEach 가드로 미인증 시 로그인 페이지로 리다이렉트한다.
  */
 import { createRouter, createWebHistory } from 'vue-router';
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    /* 로그인 페이지 — AdminLayout 밖 (인증 불필요) */
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { requiresAuth: false }
+    },
+    /* 관리자 페이지 — AdminLayout 내 (인증 필요) */
     {
       path: '/',
       component: () => import('../components/layout/AdminLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
           name: 'dashboard',
           component: () => import('../views/DashboardView.vue')
-        },
-        /* 그룹코드관리 */
-        {
-          path: 'group-codes',
-          name: 'groupCodes',
-          component: () => import('../views/GroupCodeListView.vue')
-        },
-        /* 코드관리 */
-        {
-          path: 'codes',
-          name: 'codes',
-          component: () => import('../views/CodeListView.vue')
         },
         /* 사용자관리 */
         {
@@ -59,7 +57,7 @@ const router = createRouter({
           name: 'practiceQuestions',
           component: () => import('../views/PracticeQuestionListView.vue')
         },
-        /* 연습문제 생성(API) — 연습문제관리에서 등록 버튼 클릭 시 진입 */
+        /* 연습문제 생성(API) */
         {
           path: 'practice-questions/create',
           name: 'practiceQuestionCreate',
@@ -68,16 +66,49 @@ const router = createRouter({
         {
           path: 'question-structures',
           name: 'questionStructures',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/PlaceholderView.vue')
         },
         {
           path: 'question-types',
           name: 'questionTypes',
-          component: () => import('../views/DashboardView.vue')
+          component: () => import('../views/PlaceholderView.vue')
+        },
+        /* 관리자 관리 */
+        {
+          path: 'admins',
+          name: 'admins',
+          component: () => import('../views/AdminManageView.vue')
+        },
+        /* 그룹코드관리 */
+        {
+          path: 'group-codes',
+          name: 'groupCodes',
+          component: () => import('../views/GroupCodeListView.vue')
+        },
+        /* 코드관리 */
+        {
+          path: 'codes',
+          name: 'codes',
+          component: () => import('../views/CodeListView.vue')
         }
       ]
     }
   ]
+});
+
+/* 네비게이션 가드 — 인증 필요 페이지에 토큰 없이 접근 시 로그인 페이지로 이동 */
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('admin_token');
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false);
+
+  if (requiresAuth && !token) {
+    next({ name: 'login' });
+  } else if (to.name === 'login' && token) {
+    /* 이미 로그인된 상태에서 로그인 페이지 접근 시 대시보드로 이동 */
+    next({ name: 'dashboard' });
+  } else {
+    next();
+  }
 });
 
 export default router;

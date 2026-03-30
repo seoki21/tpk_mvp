@@ -25,6 +25,10 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
 
+# 초기 관리자 계정 (DB 시딩용 — 실제 비밀번호는 DB에 bcrypt 해시로 저장됨)
+SUPER_ADMIN_ID = "admin"
+SUPER_ADMIN_PASSWORD = "dear#405"
+
 # AI (Anthropic Claude) 설정
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
@@ -32,3 +36,16 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 # AI (Google Gemini) 설정
 GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY", "")
 GOOGLE_AI_MODEL = os.getenv("GOOGLE_AI_MODEL", "gemini-2.5-flash")
+
+# AI 모델별 토큰 단가 (USD per 1M tokens) — 비용 추적용
+AI_TOKEN_PRICING = {
+    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
+    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+    "gemini-2.5-flash": {"input": 0.15, "output": 0.60},
+}
+
+# 외부 AI 관리 콘솔 URL
+AI_CONSOLE_URLS = {
+    "claude": "https://console.anthropic.com",
+    "gemini": "https://aistudio.google.com",
+}
