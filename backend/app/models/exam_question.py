@@ -34,6 +34,7 @@ class PdfConvertRequest(BaseModel):
     """PDF → JSON 변환 요청 스키마"""
     pdf_key: int = Field(..., description="변환할 PDF 파일 키")
     ai_provider: str = Field("claude", description="AI 제공자 (claude 또는 gemini)")
+    section: Optional[str] = Field(None, description="영역 (듣기, 읽기 등) — 프롬프트 분기용")
 
 
 class FeedbackGenerateRequest(BaseModel):

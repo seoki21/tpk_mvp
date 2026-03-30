@@ -81,15 +81,23 @@ export function updateQuestionSingle(examKey, questionNo, questionJson, feedback
  *   - type: 'start' | 'text_delta' | 'done' | 'error'
  *   - data: 이벤트별 데이터 객체
  * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
+ * @param {string|null} section - 영역 (듣기/읽기) — 프롬프트 분기용
  */
-export async function convertPdfToJsonStream(examKey, pdfKey, onEvent, aiProvider = 'claude') {
+export async function convertPdfToJsonStream(examKey, pdfKey, onEvent, aiProvider = 'claude', section = null) {
   /* API base URL — 개발 환경에서는 빈 문자열(Vite 프록시 사용) */
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
 
+  /* localStorage에서 JWT 토큰을 읽어 Authorization 헤더에 첨부 */
+  const token = localStorage.getItem('admin_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${baseUrl}/api/v1/exam-list/${examKey}/convert`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdf_key: pdfKey, ai_provider: aiProvider })
+    headers,
+    body: JSON.stringify({ pdf_key: pdfKey, ai_provider: aiProvider, section })
   });
 
   /* HTTP 에러 응답 처리 (스트리밍 시작 전 에러) */

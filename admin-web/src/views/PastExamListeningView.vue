@@ -1,7 +1,7 @@
 <!--
-  기출문제 관리 페이지 (읽기 영역)
+  기출문제 관리 페이지 (듣기 영역)
   - 상단 조회조건: 기출문제 selectbox + 영역 selectbox + 파일 selectbox + 변환/저장 버튼
-  - 하단: 문제 목록(JSON → 화면) — 좌측 JSON 텍스트 + 우측 UI 렌더링
+  - 하단: 문제 목록(JSON → 화면) — 좌측 JSON 텍스트 + 우측 듣기 문항 UI (MP3 플레이어 포함)
   - 마운트 시 기출문제 목록을 조회한다.
 -->
 <script setup>
@@ -10,7 +10,7 @@ import { useExamQuestionCommon } from '@/composables/useExamQuestionCommon';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import ExamQuestionHeader from '@/components/examQuestion/ExamQuestionHeader.vue';
 import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
-import ExamQuestionCard from '@/components/examQuestion/ExamQuestionCard.vue';
+import ExamListeningQuestionCard from '@/components/examQuestion/ExamListeningQuestionCard.vue';
 import JsonEditorPanel from '@/components/examQuestion/JsonEditorPanel.vue';
 
 const {
@@ -45,7 +45,7 @@ onMounted(() => {
 <template>
   <div class="flex h-full flex-col">
     <!-- 서브 타이틀 -->
-    <h2 class="mb-4 text-xl font-bold text-gray-800">기출문제 관리</h2>
+    <h2 class="mb-4 text-xl font-bold text-gray-800">기출문제 관리 (듣기)</h2>
 
     <!-- 상단 조회조건 (공통 컴포넌트) -->
     <ExamQuestionHeader
@@ -65,7 +65,7 @@ onMounted(() => {
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-gray-300">
       <div class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2">
         <div>
-          <span class="text-sm font-medium text-gray-700">문제 목록</span>
+          <span class="text-sm font-medium text-gray-700">문제 목록 (듣기)</span>
           <span class="ml-2 text-xs text-gray-400">※ JSON 데이터를 수정하면 우측 화면에서 실시간으로 결과를 확인할 수 있습니다</span>
         </div>
       </div>
@@ -108,21 +108,23 @@ onMounted(() => {
               @save-item="handleSaveItemSingle(item)"
             />
 
-            <!-- 우측: 시험지 UI (60%) -->
+            <!-- 우측: 시험지 UI (60%) — 듣기 문항 카드 -->
             <div class="w-3/5 min-w-0">
-              <!-- 지시문 렌더링 -->
+              <!-- 지시문 렌더링 (공통) -->
               <ExamInstructionCard
                 v-if="item._type === 'instruction'"
                 :item="item"
                 :parsed="getEditState(item).parsed"
               />
-              <!-- 문항 렌더링 (읽기) -->
-              <ExamQuestionCard
+              <!-- 듣기 문항 렌더링 (MP3 플레이어 포함) -->
+              <ExamListeningQuestionCard
                 v-if="item._type === 'question'"
                 :item="item"
                 :parsed="getEditState(item).parsed"
                 :correct-answer="getCorrectAnswer(item)"
                 :feedback-data="getFeedbackData(item)"
+                :mp3-file="store.mp3FileMap[item.question_no] || null"
+                :exam-key="store.selectedExamKey"
               />
             </div>
           </div>

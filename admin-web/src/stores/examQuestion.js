@@ -52,6 +52,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
   /** 로딩 상태 */
   const loading = ref(false);
 
+  /** MP3 파일 목록 (file_type='mp3') — 듣기 화면용 */
+  const mp3Files = ref([]);
+
   /* ========== 계산된 속성 ========== */
 
   /** 선택된 시험 정보 */
@@ -103,6 +106,22 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
       return 0;
     });
     return items;
+  });
+
+  /**
+   * 문제번호 → MP3 파일 매핑
+   * 파일명 형식 "[N1]-[N2].mp3"에서 N2를 추출하여 문제번호와 매칭한다.
+   */
+  const mp3FileMap = computed(() => {
+    const map = {};
+    mp3Files.value.forEach((file) => {
+      const match = file.file_name.match(/\d+-(\d+)\.mp3$/i);
+      if (match) {
+        const questionNo = parseInt(match[1], 10);
+        map[questionNo] = file;
+      }
+    });
+    return map;
   });
 
   /* ========== 액션 ========== */
@@ -165,8 +184,23 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
   }
 
   /**
+   * MP3 파일 목록 조회 — 듣기 화면에서 문제별 음성 재생에 사용
+   * @param {number} examKey - 시험키 PK
+   */
+  async function fetchMp3Files(examKey) {
+    try {
+      const res = await getFiles(examKey);
+      const allFiles = res.data || [];
+      mp3Files.value = allFiles.filter((f) => f.file_type === 'mp3');
+    } catch (error) {
+      console.error('[ExamQuestion Store] fetchMp3Files 실패:', error);
+      mp3Files.value = [];
+    }
+  }
+
+  /**
    * 시험 선택 변경 처리
-   * - 파일 목록만 로드 (문제/지시문은 파일 선택 시 조회)
+   * - 파일 목록(PDF) + MP3 파일 목록을 동시에 로드
    * @param {number} examKey - 시험키 PK
    */
   async function selectExam(examKey) {
@@ -175,9 +209,10 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
     fileOptions.value = [];
     questions.value = [];
     instructions.value = [];
+    mp3Files.value = [];
 
     if (examKey) {
-      await fetchFileOptions(examKey);
+      await Promise.all([fetchFileOptions(examKey), fetchMp3Files(examKey)]);
     }
   }
 
@@ -202,8 +237,11 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
     selectedExam,
     selectedFile,
     mergedItems,
+    mp3Files,
+    mp3FileMap,
     fetchExamOptions,
     fetchFileOptions,
+    fetchMp3Files,
     fetchQuestionsAndInstructions,
     selectExam,
     selectFile

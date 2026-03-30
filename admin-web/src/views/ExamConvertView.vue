@@ -90,6 +90,12 @@ const examTitle = computed(() => {
   return parts.join(' ');
 });
 
+/** 선택된 시험의 영역 코드 — PDF→JSON 변환 시 프롬프트 분기용 */
+const examSection = computed(() => {
+  const info = store.selectedExam;
+  return info ? info.section : null;
+});
+
 /** 파일명 */
 const fileName = computed(() => {
   const info = store.selectedFile;
@@ -260,7 +266,7 @@ async function confirmConvert() {
           toast.error(event.data.detail || 'PDF 변환에 실패했습니다.');
           break;
       }
-    }, selectedAiProvider.value);
+    }, selectedAiProvider.value, examSection.value);
   } catch {
     streamStatus.value = 'error';
     toast.error('PDF 변환 중 네트워크 오류가 발생했습니다.');

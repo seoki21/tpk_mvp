@@ -45,6 +45,12 @@ const router = createRouter({
           name: 'pastExamQuestions',
           component: () => import('../views/PastExamQuestionView.vue')
         },
+        /* 기출문제관리 (듣기) — 영역 전환 시 자동 이동 */
+        {
+          path: 'past-exam-listening',
+          name: 'pastExamListening',
+          component: () => import('../views/PastExamListeningView.vue')
+        },
         /* 기출문항 변환(JSON) — 기출문제관리에서 진입 */
         {
           path: 'past-exam-questions/:examKey/:pdfKey/convert',

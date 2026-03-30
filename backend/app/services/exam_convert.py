@@ -69,9 +69,63 @@ def _format_sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-# PDF 분석 프롬프트 (외부 파일에서 로드)
+# PDF 분석 프롬프트 (외부 파일에서 로드, 영역별 분기)
 from app.utils.prompt_loader import load_prompt
+from app.database import get_connection
+
 _PDF_CONVERT_PROMPT = load_prompt("pdf_convert")
+_PDF_CONVERT_LISTENING_PROMPT = load_prompt("pdf_convert_listening")
+
+# 영역 code_name → 프롬프트 매핑 (매핑에 없는 영역은 기본 프롬프트 사용)
+_SECTION_PROMPT_MAP = {
+    "듣기": _PDF_CONVERT_LISTENING_PROMPT,
+}
+
+
+def _get_section_name(section_code: str) -> Optional[str]:
+    """
+    영역 코드 값으로 tb_code에서 code_name을 조회하여 반환한다.
+
+    Args:
+        section_code: 영역 코드 (예: "1", "2")
+
+    Returns:
+        코드명 (예: "듣기", "읽기") 또는 None
+    """
+    if not section_code:
+        return None
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT code_name
+              FROM tb_code
+             WHERE group_code = 'section'
+               AND code = %s
+            """,
+            (int(section_code),),
+        )
+        row = cursor.fetchone()
+        return row["code_name"] if row else None
+    finally:
+        conn.close()
+
+
+def _get_prompt_by_section(section_code: str) -> str:
+    """
+    영역 코드로 적절한 PDF 변환 프롬프트를 반환한다.
+    tb_code에서 code_name을 조회한 뒤 매핑 테이블에서 프롬프트를 찾는다.
+    매핑에 없는 영역은 기본 프롬프트(pdf_convert)를 사용한다.
+
+    Args:
+        section_code: 영역 코드 (예: "1", "2")
+
+    Returns:
+        프롬프트 텍스트
+    """
+    section_name = _get_section_name(section_code)
+    return _SECTION_PROMPT_MAP.get(section_name, _PDF_CONVERT_PROMPT)
 
 
 def _get_pdf_file_info(pdf_key: int):
@@ -98,13 +152,14 @@ def _get_pdf_file_info(pdf_key: int):
     return file_info, file_path
 
 
-async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerator[str, None]:
+async def _convert_with_claude(file_info: dict, file_path: str, section: str = None) -> AsyncGenerator[str, None]:
     """
     Claude API 스트리밍으로 PDF를 JSON으로 변환한다.
 
     Args:
         file_info: 파일 메타데이터
         file_path: PDF 파일 경로
+        section: 영역 (듣기/읽기) — 프롬프트 분기용
 
     Yields:
         SSE 형식 문자열
@@ -113,6 +168,9 @@ async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerato
 
     # PDF 파일을 base64로 인코딩 (블로킹 I/O → 별도 스레드)
     pdf_data = await asyncio.to_thread(_read_pdf_as_base64, file_path)
+
+    # 영역 코드로 적절한 프롬프트 조회
+    prompt = _get_prompt_by_section(section)
 
     # start 이벤트 전송 — 변환 시작 알림
     yield _format_sse("start", {
@@ -139,7 +197,7 @@ async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerato
                         },
                         {
                             "type": "text",
-                            "text": _PDF_CONVERT_PROMPT,
+                            "text": prompt,
                         },
                     ],
                 }
@@ -176,13 +234,14 @@ async def _convert_with_claude(file_info: dict, file_path: str) -> AsyncGenerato
         yield _format_sse("error", {"detail": f"PDF 변환 실패: {e.message}"})
 
 
-async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerator[str, None]:
+async def _convert_with_gemini(file_info: dict, file_path: str, section: str = None) -> AsyncGenerator[str, None]:
     """
     Google Gemini API 스트리밍으로 PDF를 JSON으로 변환한다.
 
     Args:
         file_info: 파일 메타데이터
         file_path: PDF 파일 경로
+        section: 영역 (듣기/읽기) — 프롬프트 분기용
 
     Yields:
         SSE 형식 문자열
@@ -191,6 +250,9 @@ async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerato
 
     # PDF 파일을 바이트로 읽기 (블로킹 I/O → 별도 스레드)
     pdf_bytes = await asyncio.to_thread(_read_pdf_bytes, file_path)
+
+    # 영역 코드로 적절한 프롬프트 조회
+    prompt = _get_prompt_by_section(section)
 
     # start 이벤트 전송
     yield _format_sse("start", {
@@ -204,7 +266,7 @@ async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerato
             model=GOOGLE_AI_MODEL,
             contents=[
                 genai.types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
-                _PDF_CONVERT_PROMPT,
+                prompt,
             ],
         )
 
@@ -240,16 +302,18 @@ async def _convert_with_gemini(file_info: dict, file_path: str) -> AsyncGenerato
 
 
 async def convert_pdf_to_json_stream(
-    exam_key: int, pdf_key: int, ai_provider: str = "claude"
+    exam_key: int, pdf_key: int, ai_provider: str = "claude", section: str = None
 ) -> AsyncGenerator[str, None]:
     """
     PDF 파일을 AI API 스트리밍으로 분석하여 SSE 이벤트를 생성한다.
     ai_provider에 따라 Claude 또는 Gemini를 사용한다.
+    section에 따라 듣기/읽기 전용 프롬프트를 분기한다.
 
     Args:
         exam_key: 시험 PK
         pdf_key: PDF 파일 PK
         ai_provider: AI 제공자 ("claude" 또는 "gemini")
+        section: 영역 (듣기/읽기) — 프롬프트 분기용
 
     Yields:
         SSE 형식 문자열 (event: type\ndata: {...}\n\n)
@@ -261,10 +325,10 @@ async def convert_pdf_to_json_stream(
     file_info, file_path = _get_pdf_file_info(pdf_key)
 
     if ai_provider == "gemini":
-        async for event in _convert_with_gemini(file_info, file_path):
+        async for event in _convert_with_gemini(file_info, file_path, section):
             yield event
     elif ai_provider == "claude":
-        async for event in _convert_with_claude(file_info, file_path):
+        async for event in _convert_with_claude(file_info, file_path, section):
             yield event
     else:
         raise ValueError(f"지원하지 않는 AI 제공자입니다: {ai_provider}")
