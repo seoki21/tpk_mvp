@@ -37,7 +37,7 @@ const loading = ref(false);
 /* ========== 모달 상태 ========== */
 const showModal = ref(false);
 const editData = ref(null);
-const form = ref({ admin_id: '', password: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' });
+const form = ref({ admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' });
 const isEditMode = ref(false);
 
 /* ========== 삭제 확인 ========== */
@@ -67,7 +67,7 @@ function handleSearch() {
 function handleRegister() {
   isEditMode.value = false;
   editData.value = null;
-  form.value = { admin_id: '', password: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' };
+  form.value = { admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' };
   showModal.value = true;
 }
 
@@ -78,6 +78,7 @@ function handleRowClick(row) {
   form.value = {
     admin_id: row.admin_id,
     password: '',
+    passwordConfirm: '',
     admin_desc: row.admin_desc || '',
     role_code: row.roles || 'MANAGER',
     del_yn: row.del_yn || 'N'
@@ -88,6 +89,13 @@ function handleRowClick(row) {
 /** 저장 */
 async function handleSave() {
   try {
+    /* 비밀번호 확인 검증 — 비밀번호 입력 시 확인 필드와 일치 여부 체크 */
+    if (form.value.password) {
+      if (form.value.password !== form.value.passwordConfirm) {
+        toast.warning('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+    }
     if (isEditMode.value) {
       const updateData = { admin_desc: form.value.admin_desc, del_yn: form.value.del_yn };
       if (form.value.password) updateData.password = form.value.password;
@@ -202,6 +210,15 @@ onMounted(() => {
           <label class="w-28 shrink-0 text-sm font-medium text-gray-700">비밀번호</label>
           <input
             v-model="form.password"
+            type="password"
+            :placeholder="isEditMode ? '변경 시에만 입력' : ''"
+            class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div class="flex items-center">
+          <label class="w-28 shrink-0 text-sm font-medium text-gray-700">비밀번호 확인</label>
+          <input
+            v-model="form.passwordConfirm"
             type="password"
             :placeholder="isEditMode ? '변경 시에만 입력' : ''"
             class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"

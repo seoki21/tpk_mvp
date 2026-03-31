@@ -93,7 +93,7 @@ onMounted(() => {
 
         <!-- 항목 목록 -->
         <div v-if="!store.loading && store.mergedItems.length > 0" class="divide-y divide-gray-200">
-          <div v-for="(item, index) in store.mergedItems" :key="index" class="flex gap-4 p-4">
+          <div v-for="item in store.mergedItems" :key="item._type + '_' + (item._type === 'question' ? item.question_no : item.ins_no)" class="flex gap-4 p-4">
             <!-- 좌측: JSON 편집 영역 (40%) -->
             <JsonEditorPanel
               :item-type="item._type"
