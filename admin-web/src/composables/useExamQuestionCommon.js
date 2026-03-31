@@ -307,26 +307,35 @@ export function useExamQuestionCommon() {
     return null;
   }
 
-  /** 문항의 피드백 데이터를 반환한다 (다국어 탭 구조). */
+  /** locale 코드 → 표시 라벨 매핑 (한국어, 3글자 이내) */
+  const localeLabels = {
+    ko: '한국어', en: '영어', vi: '베트남', zh: '중국어',
+    'zh-TW': '대만어', th: '태국어', id: '인니어', uz: '우즈벡',
+    ru: '러시아', ja: '일본어', mn: '몽골어', ne: '네팔어', my: '미얀마'
+  };
+
+  /**
+   * 문항의 피드백 데이터를 반환한다 (다국어 탭 구조).
+   * feedback_json의 키를 기반으로 동적으로 탭을 생성한다.
+   * ko가 있으면 항상 첫 번째 탭으로 표시한다.
+   */
   function getFeedbackData(item) {
-    const langOrder = [
-      { key: 'ko', label: '한국어' },
-      { key: 'en', label: 'English' },
-      { key: 'ja', label: '日本語' },
-      { key: 'zh', label: '中文' },
-      { key: 'vi', label: 'Tiếng Việt' }
-    ];
     const state = getEditState(item);
     const fbParsed = state.feedbackParsed || item._feedbackParsed;
 
     if (fbParsed) {
       const feedbackMap = fbParsed.feedback || fbParsed;
-      const hasData = langOrder.some((l) => Array.isArray(feedbackMap[l.key]) && feedbackMap[l.key].length);
-      if (hasData) {
-        const tabs = langOrder.map((l) => ({
-          key: l.key,
-          label: l.label,
-          list: Array.isArray(feedbackMap[l.key]) ? feedbackMap[l.key] : []
+      /* feedback_json의 키 중 배열 값이 있는 것만 탭으로 생성 */
+      const keys = Object.keys(feedbackMap).filter(
+        (k) => Array.isArray(feedbackMap[k]) && feedbackMap[k].length
+      );
+      if (keys.length > 0) {
+        /* ko를 맨 앞으로 정렬 */
+        keys.sort((a, b) => (a === 'ko' ? -1 : b === 'ko' ? 1 : 0));
+        const tabs = keys.map((k) => ({
+          key: k,
+          label: localeLabels[k] || k,
+          list: feedbackMap[k]
         }));
         return { tabs, source: 'feedback_json' };
       }
@@ -334,11 +343,7 @@ export function useExamQuestionCommon() {
 
     const parsed = getEditState(item).parsed;
     if (parsed && parsed.feedback && parsed.feedback.length) {
-      const tabs = langOrder.map((l) => ({
-        key: l.key,
-        label: l.label,
-        list: l.key === 'ko' ? parsed.feedback : []
-      }));
+      const tabs = [{ key: 'ko', label: '한국어', list: parsed.feedback }];
       return { tabs, source: 'question_json' };
     }
 
@@ -354,20 +359,60 @@ export function useExamQuestionCommon() {
     return parts.join(' ') || `시험 ${exam.exam_key}`;
   }
 
-  /* ========== 피드백 생성 ========== */
+  /* ========== 피드백 생성 (locale 선택 팝업 연동) ========== */
   const feedbackGenerating = ref(false);
 
-  /** 개별 문항 피드백 생성 */
-  async function handleGenerateFeedbackForItem(item) {
+  /** locale 선택 다이얼로그 표시 여부 */
+  const showLocaleDialog = ref(false);
+
+  /** locale 선택 후 실행할 콜백 */
+  const localeCallback = ref(null);
+
+  /** 현재 문항에 이미 존재하는 피드백의 locale 코드 목록 (팝업 기본 체크 판단용) */
+  const existingFeedbackLocales = ref([]);
+
+  /** locale 선택 다이얼로그 — 확인 (선택된 locale 목록으로 콜백 실행) */
+  function handleLocaleConfirm(locales) {
+    showLocaleDialog.value = false;
+    if (localeCallback.value) localeCallback.value(locales);
+  }
+
+  /** locale 선택 다이얼로그 — 취소 */
+  function handleLocaleCancel() {
+    showLocaleDialog.value = false;
+    localeCallback.value = null;
+  }
+
+  /**
+   * 문항의 기존 피드백에서 데이터가 있는 locale 코드 목록을 추출한다.
+   * @param {Object} item - mergedItems의 항목
+   * @returns {string[]} 피드백이 존재하는 locale 코드 배열 (예: ['ko', 'en', 'ja'])
+   */
+  function _getExistingFeedbackLocales(item) {
+    const state = getEditState(item);
+    const fbParsed = state.feedbackParsed || item._feedbackParsed;
+    if (!fbParsed) return [];
+    const feedbackMap = fbParsed.feedback || fbParsed;
+    return Object.keys(feedbackMap).filter(
+      (k) => Array.isArray(feedbackMap[k]) && feedbackMap[k].length > 0
+    );
+  }
+
+  /** 개별 문항 피드백 생성 — locale 선택 팝업 후 실행 */
+  function handleGenerateFeedbackForItem(item) {
     if (!store.selectedExamKey) return;
 
-    confirmMessage.value = '피드백을 생성하시겠습니까? Claude API를 사용합니다';
-    confirmCallback.value = async () => {
+    /* 기존 피드백 locale 목록을 팝업에 전달 */
+    existingFeedbackLocales.value = _getExistingFeedbackLocales(item);
+
+    localeCallback.value = async (locales) => {
       feedbackGenerating.value = true;
       try {
         const state = getEditState(item);
         const questionJson = JSON.stringify(JSON.parse(state.text));
-        const res = await generateFeedbackSingle(questionJson);
+        /* 시험의 영역명을 전달 (듣기/읽기 프롬프트 분기용) */
+        const section = store.selectedExam?.section_name || null;
+        const res = await generateFeedbackSingle(questionJson, 'claude', locales, section);
         const feedbackJson = res.data?.feedback_json;
 
         if (feedbackJson) {
@@ -383,7 +428,7 @@ export function useExamQuestionCommon() {
         feedbackGenerating.value = false;
       }
     };
-    showConfirm.value = true;
+    showLocaleDialog.value = true;
   }
 
   /** 단건 저장 상태 */
@@ -466,8 +511,12 @@ export function useExamQuestionCommon() {
     getCorrectAnswer,
     getFeedbackData,
     getExamLabel,
-    /* 피드백 생성 */
+    /* 피드백 생성 (locale 선택 팝업) */
     feedbackGenerating,
+    showLocaleDialog,
+    existingFeedbackLocales,
+    handleLocaleConfirm,
+    handleLocaleCancel,
     handleGenerateFeedbackForItem,
     /* 단건 저장 */
     itemSaving,

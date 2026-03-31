@@ -26,7 +26,7 @@ def generate_feedback_single(body: FeedbackGenerateRequest):
     """
     try:
         feedback_json = exam_feedback_service.generate_feedback_single(
-            body.question_json, body.ai_provider
+            body.question_json, body.ai_provider, body.locales, body.section
         )
         return BaseResponse(data={"feedback_json": feedback_json}, message="피드백 생성 완료")
     except ValueError as e:
@@ -83,8 +83,9 @@ def generate_feedback(exam_key: int, body: FeedbackBatchRequest = None):
     ai_provider로 Claude 또는 Gemini를 선택할 수 있다.
     """
     ai_provider = body.ai_provider if body else "claude"
+    locales = body.locales if body else None
     try:
-        result = exam_feedback_service.generate_feedback_batch(exam_key, ai_provider)
+        result = exam_feedback_service.generate_feedback_batch(exam_key, ai_provider, locales)
         return BaseResponse(data=result, message="피드백 생성 완료")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

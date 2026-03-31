@@ -5,9 +5,10 @@
   - 마운트 시 그룹코드 전체 목록과 코드 페이징 목록을 조회한다.
 -->
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useCodeStore } from '@/stores/code';
 import { useGroupCodeStore } from '@/stores/groupCode';
+import * as codeApi from '@/api/code';
 import SearchBar from '@/components/common/SearchBar.vue';
 import DataTable from '@/components/common/DataTable.vue';
 import Pagination from '@/components/common/Pagination.vue';
@@ -15,6 +16,14 @@ import CodeFormModal from '@/components/code/CodeFormModal.vue';
 
 const codeStore = useCodeStore();
 const groupCodeStore = useGroupCodeStore();
+
+/** DataTable 컴포넌트 ref (generateExcel 호출용) */
+const dataTableRef = ref(null);
+
+/** 그룹코드 셀렉트박스용 — group_code 오름차순 정렬 */
+const sortedGroupCodes = computed(() =>
+  [...groupCodeStore.allGroupCodes].sort((a, b) => a.group_code.localeCompare(b.group_code, 'ko'))
+);
 
 /* ========== 테이블 컬럼 정의 ========== */
 const columns = [
@@ -77,6 +86,35 @@ function handlePageSizeChange(newSize) {
   codeStore.fetchList();
 }
 
+/**
+ * 엑셀 다운로드 — 전체 코드 목록 조회(삭제 제외) 후 엑셀 생성
+ * API size 최대값이 100이므로 페이지 반복 조회하여 전체 데이터를 수집한다.
+ */
+async function handleExcelDownload() {
+  try {
+    const maxSize = 100;
+    let currentPage = 1;
+    let allData = [];
+    let totalCount = 0;
+
+    /* 첫 페이지 조회로 전체 건수 파악 후 나머지 페이지 반복 조회 */
+    do {
+      const res = await codeApi.getList({ page: currentPage, size: maxSize });
+      const rows = res.list || res.data || [];
+      allData = allData.concat(rows);
+      totalCount = res.total || 0;
+      currentPage++;
+    } while (allData.length < totalCount);
+
+    /* 삭제 코드 제외 */
+    allData = allData.filter((row) => row.del_yn !== 'Y');
+    dataTableRef.value?.generateExcel(allData);
+  } catch (error) {
+    console.error('[CodeListView] 엑셀 다운로드 실패:', error);
+    alert(error.detail || '엑셀 다운로드 중 오류가 발생했습니다.');
+  }
+}
+
 /* ========== 초기 데이터 로드 ========== */
 onMounted(() => {
   groupCodeStore.fetchAllGroupCodes();
@@ -100,7 +138,7 @@ onMounted(() => {
         >
           <option value=""></option>
           <option
-            v-for="gc in groupCodeStore.allGroupCodes"
+            v-for="gc in sortedGroupCodes"
             :key="gc.group_code"
             :value="gc.group_code"
           >
@@ -123,13 +161,16 @@ onMounted(() => {
 
     <!-- 데이터 테이블 -->
     <DataTable
+      ref="dataTableRef"
       :columns="columns"
       :data="codeStore.list"
       :loading="codeStore.loading"
       :page-size="codeStore.size"
       :total="codeStore.total"
+      excel-file-name="코드목록"
       @row-click="handleRowClick"
       @update:page-size="handlePageSizeChange"
+      @excel-download="handleExcelDownload"
     />
 
     <!-- 페이지네이션 -->

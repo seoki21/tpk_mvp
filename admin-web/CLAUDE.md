@@ -133,8 +133,8 @@ corepack pnpm run format      # Prettier 포매팅
     - 좌측 JSON 영역: pretty-print + 구문 강조 (키=보라, 문자열=초록, 숫자=파랑, boolean=주황)
     - 우측 시험지 UI 렌더링
       - store `mergedItems`에서 `_parsed` 필드로 JSON 1회 파싱 (템플릿 내 반복 파싱 금지)
-      - 지시문: 상단 `지시문 {no} [{no_list}] {score}점`, 본문에 `full_sentence` + `paragraph` (보기 텍스트 없이 테두리 박스만)
-      - 문항: 상단 `{no}번 {section} {type} {score}점` (section/type/score 각각 다른 배경색 뱃지: 파랑/초록/노랑), 본문에 `full_sentence` + `paragraph` + `{no}. {question_text}` + 선택지(2열), 하단 별도 영역에 정답 번호 + 피드백 해설 표시
+      - 지시문: 상단 `지시문 {no} [{no_list}] {score}점`, 본문에 `question_text` + `choices` (선택지 테두리 박스)
+      - 문항: 상단 `{no}번 {section} {type} {score}점` (section/type/score 각각 다른 배경색 뱃지: 파랑/초록/노랑), 본문에 `{no}. {question_text}` + 선택지(2열), 하단 별도 영역에 정답 번호 + 피드백 해설 표시
 - 기출문항 변환(JSON) 팝업
 
   * 구현 파일: `components/examQuestion/ExamConvertModal.vue`

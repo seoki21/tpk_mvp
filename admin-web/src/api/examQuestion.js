@@ -27,9 +27,10 @@ export function bulkSave(examKey, data) {
  * 해당 시험의 모든 문제에 대해 feedback_json을 생성하여 DB에 저장한다.
  * @param {number} examKey - 시험키 PK
  * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
+ * @param {string[]|null} locales - 생성할 locale 코드 목록 (null이면 ko만)
  */
-export function generateFeedback(examKey, aiProvider = 'claude') {
-  return api.post(`/api/v1/exam-feedback/${examKey}/generate`, { ai_provider: aiProvider });
+export function generateFeedback(examKey, aiProvider = 'claude', locales = null) {
+  return api.post(`/api/v1/exam-feedback/${examKey}/generate`, { ai_provider: aiProvider, locales });
 }
 
 /**
@@ -37,9 +38,16 @@ export function generateFeedback(examKey, aiProvider = 'claude') {
  * question_json을 전달하여 다국어 피드백을 생성한다. DB 저장 없이 결과만 반환.
  * @param {string} questionJson - 문제 JSON 문자열
  * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
+ * @param {string[]|null} locales - 생성할 locale 코드 목록 (null이면 ko만)
+ * @param {string|null} section - 영역명 (듣기/읽기 — 프롬프트 분기용)
  */
-export function generateFeedbackSingle(questionJson, aiProvider = 'claude') {
-  return api.post('/api/v1/exam-feedback/generate-single', { question_json: questionJson, ai_provider: aiProvider }, { timeout: 20000 });
+export function generateFeedbackSingle(questionJson, aiProvider = 'claude', locales = null, section = null) {
+  return api.post('/api/v1/exam-feedback/generate-single', {
+    question_json: questionJson,
+    ai_provider: aiProvider,
+    locales,
+    section,
+  }, { timeout: 120000 });
 }
 
 /**

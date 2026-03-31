@@ -2,6 +2,7 @@
 기출문항 피드백 생성 서비스 모듈
 Claude API 또는 Google Gemini API를 사용하여 question_json 기반으로 다국어 피드백(feedback_json)을 생성한다.
 각 문제별로 AI API를 호출하고, 결과를 row 단위로 DB에 UPDATE한다.
+선택된 locale 목록에 따라 프롬프트에 언어 목록을 동적으로 주입한다.
 """
 import json
 from typing import Optional
@@ -51,6 +52,51 @@ def _get_google_client() -> genai.Client:
 # 피드백 생성 프롬프트 (외부 파일에서 로드)
 from app.utils.prompt_loader import load_prompt
 _FEEDBACK_PROMPT_TEMPLATE = load_prompt("feedback_generate")
+_FEEDBACK_LISTENING_PROMPT_TEMPLATE = load_prompt("feedback_generate_listening")
+
+
+def _build_languages_text(locales: list[str]) -> str:
+    """
+    선택된 locale 코드 목록을 프롬프트에 삽입할 언어 목록 텍스트로 변환한다.
+    한국어(ko)는 기본 피드백 작성 언어이므로 번역 목록에서 제외한다.
+
+    Args:
+        locales: locale 코드 목록 (예: ['ko', 'en', 'ja', 'zh'])
+
+    Returns:
+        프롬프트에 삽입할 언어 목록 텍스트 (예: "1. 영어 en\n2. 일본어 ja\n3. 중국어 zh")
+    """
+    # locale 코드 → 언어명 매핑 (tb_code의 code_desc 대신 고정 매핑 사용 — 프롬프트 일관성)
+    locale_names = {
+        "en": "영어", "vi": "베트남어", "zh": "중국어", "zh-TW": "대만어",
+        "th": "태국어", "id": "인도네시아어", "uz": "우즈베키스탄어", "ru": "러시아어",
+        "ja": "일본어", "mn": "몽골어", "ne": "네팔어", "my": "미얀마어",
+    }
+    # ko 제외, 번역 대상 언어만 번호 매겨서 목록 생성
+    lines = []
+    idx = 1
+    for loc in locales:
+        if loc == "ko":
+            continue
+        name = locale_names.get(loc, loc)
+        lines.append(f"{idx}. {name} {loc}")
+        idx += 1
+    return "\n".join(lines)
+
+
+def _get_prompt_template(section: str = None) -> str:
+    """
+    영역에 따라 적절한 피드백 프롬프트 템플릿을 반환한다.
+
+    Args:
+        section: 영역명 ('듣기', '읽기' 등). None이면 기본(읽기) 프롬프트.
+
+    Returns:
+        프롬프트 템플릿 문자열
+    """
+    if section == "듣기":
+        return _FEEDBACK_LISTENING_PROMPT_TEMPLATE
+    return _FEEDBACK_PROMPT_TEMPLATE
 
 
 def _list_questions_for_feedback(exam_key: int) -> list[dict]:
@@ -78,6 +124,34 @@ def _list_questions_for_feedback(exam_key: int) -> list[dict]:
             (exam_key,),
         )
         return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+def _get_section_name_by_exam(exam_key: int) -> Optional[str]:
+    """
+    시험키로 영역명(section_name)을 조회한다.
+
+    Args:
+        exam_key: 시험 PK
+
+    Returns:
+        영역명 (예: '듣기', '읽기') 또는 None
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT c.code_name AS section_name
+              FROM tb_exam_list e
+              LEFT JOIN tb_code c ON c.group_code = 'section' AND c.code = e.section
+             WHERE e.exam_key = %s
+            """,
+            (exam_key,),
+        )
+        row = cursor.fetchone()
+        return row["section_name"] if row else None
     finally:
         conn.close()
 
@@ -230,28 +304,44 @@ def _extract_json_from_response(result_text: str) -> str:
         try:
             parsed = json.loads(cleaned)
         except json.JSONDecodeError:
-            # 보정 실패 시 원본 응답 로그 출력 후 에러 전달
-            print(f"[피드백 JSON 파싱 실패] 원본 응답:\n{result_text}")
-            raise
+            # 보정 실패 — 다국어 문자를 포함하지 않는 안전한 에러 메시지 생성
+            raise ValueError(
+                f"AI 응답 JSON 파싱 실패 (응답 길이: {len(result_text)}자). "
+                "max_tokens 부족으로 응답이 잘렸을 수 있습니다. 언어 수를 줄여서 다시 시도하세요."
+            )
     return json.dumps(parsed, ensure_ascii=False)
 
 
-def _generate_feedback_claude(question_json: str) -> str:
+def _calc_max_tokens(locales: list[str] = None) -> int:
+    """
+    선택된 locale 수에 비례하여 적절한 max_tokens를 계산한다.
+    언어 1개당 약 500토큰, 기본(ko) 1000토큰 + 여유 500토큰.
+    """
+    lang_count = len(locales) if locales else 1
+    return min(1000 + lang_count * 500 + 500, 16000)
+
+
+def _generate_feedback_claude(question_json: str, locales: list[str] = None, section: str = None) -> str:
     """
     Claude API를 호출하여 단일 문제에 대한 다국어 피드백을 생성한다.
 
     Args:
         question_json: 문제 JSON 문자열
+        locales: 생성할 locale 코드 목록 (None이면 ko만)
+        section: 영역명 (프롬프트 분기용)
 
     Returns:
         피드백 JSON 문자열 (minified)
     """
     client = _get_anthropic_client()
-    prompt = _FEEDBACK_PROMPT_TEMPLATE.replace("{question_json}", question_json)
+    template = _get_prompt_template(section)
+    languages_text = _build_languages_text(locales) if locales else ""
+    prompt = template.replace("{languages}", languages_text).replace("{question_json}", question_json)
+    max_tokens = _calc_max_tokens(locales)
 
     response = client.messages.create(
         model=ANTHROPIC_MODEL,
-        max_tokens=2048,
+        max_tokens=max_tokens,
         messages=[
             {"role": "user", "content": prompt}
         ],
@@ -273,18 +363,22 @@ def _generate_feedback_claude(question_json: str) -> str:
     return _extract_json_from_response(result_text)
 
 
-def _generate_feedback_gemini(question_json: str) -> str:
+def _generate_feedback_gemini(question_json: str, locales: list[str] = None, section: str = None) -> str:
     """
     Google Gemini API를 호출하여 단일 문제에 대한 다국어 피드백을 생성한다.
 
     Args:
         question_json: 문제 JSON 문자열
+        locales: 생성할 locale 코드 목록 (None이면 ko만)
+        section: 영역명 (프롬프트 분기용)
 
     Returns:
         피드백 JSON 문자열 (minified)
     """
     client = _get_google_client()
-    prompt = _FEEDBACK_PROMPT_TEMPLATE.replace("{question_json}", question_json)
+    template = _get_prompt_template(section)
+    languages_text = _build_languages_text(locales) if locales else ""
+    prompt = template.replace("{languages}", languages_text).replace("{question_json}", question_json)
 
     response = client.models.generate_content(
         model=GOOGLE_AI_MODEL,
@@ -302,7 +396,10 @@ def _generate_feedback_gemini(question_json: str) -> str:
     return _extract_json_from_response(response.text)
 
 
-def _generate_feedback_for_question(question_json: str, ai_provider: str = "claude") -> str:
+def _generate_feedback_for_question(
+    question_json: str, ai_provider: str = "claude",
+    locales: list[str] = None, section: str = None
+) -> str:
     """
     AI API를 호출하여 단일 문제에 대한 다국어 피드백을 생성한다.
     ai_provider에 따라 Claude 또는 Gemini를 사용한다.
@@ -310,6 +407,8 @@ def _generate_feedback_for_question(question_json: str, ai_provider: str = "clau
     Args:
         question_json: 문제 JSON 문자열
         ai_provider: AI 제공자 ("claude" 또는 "gemini")
+        locales: 생성할 locale 코드 목록
+        section: 영역명 (프롬프트 분기용)
 
     Returns:
         피드백 JSON 문자열 (minified)
@@ -318,14 +417,17 @@ def _generate_feedback_for_question(question_json: str, ai_provider: str = "clau
         ValueError: 지원하지 않는 AI 제공자인 경우
     """
     if ai_provider == "gemini":
-        return _generate_feedback_gemini(question_json)
+        return _generate_feedback_gemini(question_json, locales, section)
     elif ai_provider == "claude":
-        return _generate_feedback_claude(question_json)
+        return _generate_feedback_claude(question_json, locales, section)
     else:
         raise ValueError(f"지원하지 않는 AI 제공자입니다: {ai_provider}")
 
 
-def generate_feedback_single(question_json: str, ai_provider: str = "claude") -> str:
+def generate_feedback_single(
+    question_json: str, ai_provider: str = "claude",
+    locales: list[str] = None, section: str = None
+) -> str:
     """
     단일 문제의 question_json을 받아 AI API로 다국어 피드백을 생성한다.
     DB 저장 없이 결과만 반환한다 (프론트에서 편집 상태에 반영).
@@ -333,14 +435,18 @@ def generate_feedback_single(question_json: str, ai_provider: str = "claude") ->
     Args:
         question_json: 문제 JSON 문자열
         ai_provider: AI 제공자 ("claude" 또는 "gemini")
+        locales: 생성할 locale 코드 목록
+        section: 영역명 (프롬프트 분기용)
 
     Returns:
         피드백 JSON 문자열 (minified, 플랫 구조)
     """
-    return _generate_feedback_for_question(question_json, ai_provider)
+    return _generate_feedback_for_question(question_json, ai_provider, locales, section)
 
 
-def generate_feedback_batch(exam_key: int, ai_provider: str = "claude") -> dict:
+def generate_feedback_batch(
+    exam_key: int, ai_provider: str = "claude", locales: list[str] = None
+) -> dict:
     """
     특정 시험의 모든 문제에 대해 피드백을 일괄 생성한다.
     각 문제별로 AI API를 호출하고, 결과를 row 단위로 DB에 UPDATE한다.
@@ -348,6 +454,7 @@ def generate_feedback_batch(exam_key: int, ai_provider: str = "claude") -> dict:
     Args:
         exam_key: 시험 PK
         ai_provider: AI 제공자 ("claude" 또는 "gemini")
+        locales: 생성할 locale 코드 목록
 
     Returns:
         처리 결과 (total, success, failed, errors 등)
@@ -362,6 +469,9 @@ def generate_feedback_batch(exam_key: int, ai_provider: str = "claude") -> dict:
             "errors": [],
         }
 
+    # 시험의 영역명 조회 (프롬프트 분기용)
+    section = _get_section_name_by_exam(exam_key)
+
     success = 0
     failed = 0
     errors = []
@@ -372,7 +482,9 @@ def generate_feedback_batch(exam_key: int, ai_provider: str = "claude") -> dict:
 
         try:
             # AI API로 피드백 생성
-            feedback_json = _generate_feedback_for_question(question_json, ai_provider)
+            feedback_json = _generate_feedback_for_question(
+                question_json, ai_provider, locales, section
+            )
 
             # DB 업데이트 (row 단위)
             _update_feedback_json(exam_key, question_no, feedback_json)

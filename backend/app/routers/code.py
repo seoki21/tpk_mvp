@@ -38,6 +38,16 @@ def list_codes(
         raise HTTPException(status_code=500, detail=f"코드 목록 조회 실패: {str(e)}")
 
 
+@router.get("/group/{group_code}", response_model=BaseResponse)
+def list_codes_by_group(group_code: str):
+    """특정 그룹코드에 속하는 활성 코드 목록을 조회한다 (셀렉트박스/체크박스용)."""
+    try:
+        rows = code_service.list_codes_by_group(group_code)
+        return BaseResponse(data=rows, message="조회 성공")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"코드 목록 조회 실패: {str(e)}")
+
+
 @router.get("/{group_code}/{code}", response_model=BaseResponse)
 def get_code(group_code: str, code: int):
     """특정 코드의 상세 정보를 조회한다."""

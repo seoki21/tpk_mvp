@@ -16,6 +16,14 @@ export function getList(params) {
 }
 
 /**
+ * 특정 그룹코드에 속하는 활성 코드 목록 조회 (셀렉트박스/체크박스용)
+ * @param {string} groupCode - 그룹코드
+ */
+export function getCodesByGroup(groupCode) {
+  return api.get(`${BASE_URL}/group/${groupCode}`);
+}
+
+/**
  * 코드 상세 조회
  * @param {string} codeGroup - 그룹코드
  * @param {string} code - 코드

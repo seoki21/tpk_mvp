@@ -8,6 +8,7 @@
 import { onMounted } from 'vue';
 import { useExamQuestionCommon } from '@/composables/useExamQuestionCommon';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
+import LocaleSelectDialog from '@/components/examQuestion/LocaleSelectDialog.vue';
 import ExamQuestionHeader from '@/components/examQuestion/ExamQuestionHeader.vue';
 import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
 import ExamListeningQuestionCard from '@/components/examQuestion/ExamListeningQuestionCard.vue';
@@ -28,8 +29,9 @@ const {
   handleSaveAll,
   /* 데이터 추출 */
   getCorrectAnswer, getFeedbackData, getExamLabel,
-  /* 피드백 생성 */
-  feedbackGenerating, handleGenerateFeedbackForItem,
+  /* 피드백 생성 (locale 선택 팝업) */
+  feedbackGenerating, showLocaleDialog, existingFeedbackLocales, handleLocaleConfirm, handleLocaleCancel,
+  handleGenerateFeedbackForItem,
   /* 단건 저장 */
   itemSaving, handleSaveItemSingle,
   /* 기타 */
@@ -138,6 +140,14 @@ onMounted(() => {
       :message="confirmMessage"
       @confirm="handleConfirm"
       @cancel="handleCancel"
+    />
+
+    <!-- locale 선택 다이얼로그 (피드백 생성용) -->
+    <LocaleSelectDialog
+      :visible="showLocaleDialog"
+      :existing-locales="existingFeedbackLocales"
+      @confirm="handleLocaleConfirm"
+      @cancel="handleLocaleCancel"
     />
   </div>
 </template>

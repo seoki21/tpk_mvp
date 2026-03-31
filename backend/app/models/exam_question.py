@@ -41,11 +41,14 @@ class FeedbackGenerateRequest(BaseModel):
     """단건 피드백 생성 요청 스키마"""
     question_json: str = Field(..., description="문제 JSON 데이터")
     ai_provider: str = Field("claude", description="AI 제공자 (claude 또는 gemini)")
+    locales: Optional[list[str]] = Field(None, description="생성할 locale 코드 목록 (예: ['ko','en','ja'])")
+    section: Optional[str] = Field(None, description="영역명 (듣기/읽기 — 프롬프트 분기용)")
 
 
 class FeedbackBatchRequest(BaseModel):
     """일괄 피드백 생성 요청 스키마"""
     ai_provider: str = Field("claude", description="AI 제공자 (claude 또는 gemini)")
+    locales: Optional[list[str]] = Field(None, description="생성할 locale 코드 목록 (예: ['ko','en','ja'])")
 
 
 class FeedbackSaveRequest(BaseModel):

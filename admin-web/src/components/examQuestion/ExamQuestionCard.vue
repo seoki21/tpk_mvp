@@ -2,7 +2,7 @@
   문항 렌더링 카드 컴포넌트
   - 기출문제 관리 화면의 우측 시험지 UI에서 문항(item_type=Q)을 렌더링한다.
   - 상단: 문항번호(정답 색상), section, type, score 뱃지
-  - 본문: full_sentence + paragraph + question_text + 선택지(2열)
+  - 본문: question_text + 선택지(2열)
   - 하단: 다국어 피드백 탭바 + 피드백 리스트
 -->
 <script setup>
@@ -110,18 +110,6 @@ function parseFeedback(fb) {
   </div>
   <!-- 본문 -->
   <template v-if="parsed">
-    <p
-      v-if="parsed.full_sentence"
-      class="mb-2 text-sm leading-relaxed text-gray-800"
-    >
-      {{ parsed.full_sentence }}
-    </p>
-    <div
-      v-if="parsed.paragraph"
-      class="mb-3 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"
-    >
-      <p class="whitespace-pre-wrap">{{ parsed.paragraph }}</p>
-    </div>
     <p
       v-if="parsed.question_text"
       class="mb-2 text-sm leading-relaxed text-gray-800"

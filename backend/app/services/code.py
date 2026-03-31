@@ -80,6 +80,34 @@ def list_codes(
         conn.close()
 
 
+def list_codes_by_group(group_code: str) -> list[dict]:
+    """
+    특정 그룹코드에 속하는 활성 코드 목록을 조회한다 (del_yn='N').
+    셀렉트박스, 체크박스 등 UI에서 동적으로 코드 목록을 표시할 때 사용한다.
+
+    Args:
+        group_code: 그룹코드
+
+    Returns:
+        코드 목록 (code, code_name, code_desc, sort_order)
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT code, code_name, code_desc, sort_order
+              FROM tb_code
+             WHERE group_code = %s AND del_yn = 'N'
+             ORDER BY sort_order ASC
+            """,
+            (group_code,),
+        )
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
 def get_code(group_code: str, code: str) -> Optional[dict]:
     """
     특정 코드의 상세 정보를 조회한다.
