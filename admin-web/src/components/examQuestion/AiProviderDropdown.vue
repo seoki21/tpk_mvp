@@ -38,16 +38,16 @@ const emit = defineEmits(['select']);
 
 const showMenu = ref(false);
 
-/** 테마별 버튼 스타일 */
+/** 테마별 버튼 스타일 (soft blue 톤 통일) */
 const themeStyles = {
-  blue: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400',
-  purple: 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400'
+  blue: 'border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400',
+  purple: 'border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400'
 };
 
 /** 테마별 드롭다운 호버 스타일 */
 const hoverStyles = {
   blue: 'hover:bg-blue-50',
-  purple: 'hover:bg-purple-50'
+  purple: 'hover:bg-blue-50'
 };
 
 function handleSelect(provider) {

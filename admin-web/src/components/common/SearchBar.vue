@@ -27,15 +27,12 @@ const emit = defineEmits(['search', 'register']);
 
     <!-- 조회/등록 버튼 영역 -->
     <div class="ml-4 flex shrink-0 items-center gap-2">
-      <button
-        class="rounded border border-gray-400 bg-gray-200 px-4 py-1.5 text-sm hover:bg-gray-300"
-        @click="emit('search')"
-      >
+      <button class="btn btn-sm btn-secondary" @click="emit('search')">
         조회
       </button>
       <button
         v-if="!hideRegister"
-        class="rounded border border-gray-400 bg-gray-200 px-4 py-1.5 text-sm hover:bg-gray-300"
+        class="btn btn-sm btn-secondary"
         @click="emit('register')"
       >
         등록

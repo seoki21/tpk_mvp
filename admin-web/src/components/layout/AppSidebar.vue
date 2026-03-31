@@ -23,9 +23,9 @@ defineProps({
 const menuItems = [
   { icon: '📊', label: '대시보드', path: '/' },
   { icon: '👤', label: '사용자 관리', path: '/users' },
-  { icon: '📝', label: '시험관리(기출)', path: '/exam-questions' },
-  { icon: '📄', label: '기출문제 관리', path: '/past-exam-questions' },
-  { icon: '📋', label: '연습문제 관리', path: '/practice-questions' },
+  { icon: '📝', label: '시험 관리', path: '/exam-questions' },
+  { icon: '📄', label: '기출문항 관리', path: '/past-exam-questions' },
+  { icon: '📋', label: '연습문항 관리', path: '/practice-questions' },
   { icon: '🏗', label: '문항구조 관리', path: '/question-structures' },
   { icon: '📂', label: '문항유형 관리', path: '/question-types' },
   { separator: true },

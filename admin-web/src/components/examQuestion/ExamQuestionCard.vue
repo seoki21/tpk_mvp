@@ -8,6 +8,14 @@
 <script setup>
 import { reactive } from 'vue';
 
+const emit = defineEmits(['open-image-crop']);
+
+/** 이미지 생성 대상 여부 — is_question_image 또는 is_choices_image 중 하나라도 'Y'이면 true */
+function hasImageFlag() {
+  if (!props.parsed) return false;
+  return props.parsed.is_question_image === 'Y' || props.parsed.is_choices_image === 'Y';
+}
+
 const props = defineProps({
   /** 문항 항목 원본 (store.mergedItems의 항목) */
   item: {
@@ -82,9 +90,9 @@ function parseFeedback(fb) {
 </script>
 
 <template>
-  <!-- 상단: {no}번 {section} {type} {score}점 -->
+  <!-- 상단: {no}번 {section} {type} {score}점 + 이미지 생성 버튼 -->
   <div class="mb-3 border-b border-gray-200 pb-2">
-    <div class="flex items-baseline gap-2 text-sm">
+    <div class="flex items-center gap-2 text-sm">
       <span class="font-bold text-gray-800">
         {{ item.question_no }}번
       </span>
@@ -106,16 +114,22 @@ function parseFeedback(fb) {
       >
         {{ parsed.score }}점
       </span>
+      <!-- 이미지 생성 버튼 — is_question_image 또는 is_choices_image가 'Y'인 경우 -->
+      <button
+        v-if="hasImageFlag()"
+        class="btn btn-xs btn-primary ml-auto"
+        @click="emit('open-image-crop', item)"
+      >
+        이미지 생성
+      </button>
     </div>
   </div>
   <!-- 본문 -->
   <template v-if="parsed">
     <p
       v-if="parsed.question_text"
-      class="mb-2 text-sm leading-relaxed text-gray-800"
-    >
-      {{ item.question_no }}. {{ parsed.question_text }}
-    </p>
+      class="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
+    >{{ item.question_no }}. {{ parsed.question_text }}</p>
     <!-- 선택지 (정답 번호와 일치하는 선택지는 피드백 정답과 동일 스타일 적용) -->
     <div
       v-if="parsed.choices"

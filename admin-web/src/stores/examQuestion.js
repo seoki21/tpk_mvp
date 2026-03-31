@@ -43,6 +43,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
   /** 선택된 파일키 */
   const selectedPdfKey = ref(null);
 
+  /** JSON 미변환 파일만 필터 체크 상태 (true: 미변환만, false: 변환완료만) */
+  const jsonFilterOnly = ref(false);
+
   /** 문제 목록 */
   const questions = ref([]);
 
@@ -54,6 +57,13 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
 
   /** MP3 파일 목록 (file_type='mp3') — 듣기 화면용 */
   const mp3Files = ref([]);
+
+  /**
+   * 통합 selectbox 옵션 — 시험 + 영역 + 파일 조합
+   * 각 항목은 { examKey, pdfKey, label, exam, file } 형태
+   * 파일이 없는 시험은 제외된다.
+   */
+  const combinedOptions = ref([]);
 
   /* ========== 계산된 속성 ========== */
 
@@ -138,6 +148,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
       const items = res.list || res.data || [];
       /* 삭제되지 않은 시험만 selectbox에 표시 */
       examOptions.value = items.filter((e) => e.del_yn !== 'Y');
+
+      /* 통합 selectbox 옵션 빌드 — 각 시험별 파일 목록을 조회하여 조합 */
+      await _buildCombinedOptions();
     } catch (error) {
       console.error('[ExamQuestion Store] fetchExamOptions 실패:', error);
       examOptions.value = [];
@@ -146,6 +159,66 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
       examOptionsLoading.value = false;
     }
   }
+
+  /**
+   * 통합 selectbox 옵션을 빌드한다.
+   * 모든 시험에 대해 파일 목록 + question 존재 여부를 병렬 조회하여 exam+file 조합 생성.
+   * 파일이 없는 시험은 제외한다.
+   */
+  async function _buildCombinedOptions() {
+    const options = [];
+    /* 모든 시험의 파일 목록 + question 존재 여부를 병렬 조회 */
+    const results = await Promise.all(
+      examOptions.value.map(async (exam) => {
+        try {
+          /* 파일 목록과 문제 존재 여부를 동시에 조회 */
+          const [fileRes, questionRes] = await Promise.all([
+            getFiles(exam.exam_key, { skipProgress: true }),
+            examQuestionApi.getQuestionsAndInstructions(exam.exam_key, { skipProgress: true })
+          ]);
+          const allFiles = fileRes.data || [];
+          const pdfFiles = allFiles.filter((f) => !f.file_type || f.file_type === 'pdf');
+          const questionData = questionRes.data || {};
+          const hasQuestionJson = (questionData.questions || []).length > 0;
+          return { exam, files: pdfFiles, hasQuestionJson };
+        } catch (err) {
+          console.error('[_buildCombinedOptions] exam_key:', exam.exam_key, err);
+          return { exam, files: [], hasQuestionJson: false };
+        }
+      })
+    );
+    /* 파일이 있는 시험만 옵션에 추가 */
+    for (const { exam, files, hasQuestionJson } of results) {
+      const examLabel = [
+        exam.exam_year ? exam.exam_year + '년' : '',
+        exam.round ? '제' + exam.round + '회' : '',
+        exam.tpk_level_name || ''
+      ].filter(Boolean).join(' ');
+      const sectionName = exam.section_name || '';
+
+      for (const file of files) {
+        options.push({
+          examKey: exam.exam_key,
+          pdfKey: file.pdf_key,
+          label: `${examLabel} | ${sectionName} | ${file.file_name}`,
+          exam,
+          file,
+          hasQuestionJson
+        });
+      }
+    }
+    combinedOptions.value = options;
+  }
+
+  /**
+   * JSON 필터 상태에 따라 combinedOptions를 필터링한 목록
+   * - jsonFilterOnly=true: question_json이 없는(미변환) 파일만
+   * - jsonFilterOnly=false: question_json이 있는(변환완료) 파일만
+   */
+  const filteredCombinedOptions = computed(() => {
+    if (!jsonFilterOnly.value) return combinedOptions.value;
+    return combinedOptions.value.filter((opt) => !opt.hasQuestionJson);
+  });
 
   /**
    * 선택된 시험의 파일 목록 조회 — 파일 selectbox 옵션 로드
@@ -228,6 +301,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
     examOptions,
     examOptionsLoading,
     examOptionsError,
+    combinedOptions,
+    filteredCombinedOptions,
+    jsonFilterOnly,
     selectedExamKey,
     fileOptions,
     selectedPdfKey,

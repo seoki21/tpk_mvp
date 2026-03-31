@@ -29,16 +29,10 @@ const emit = defineEmits(['confirm', 'cancel']);
 
         <!-- 버튼 영역 -->
         <div class="flex items-center justify-center gap-3">
-          <button
-            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
-            @click="emit('confirm')"
-          >
+          <button class="btn btn-sm btn-primary px-6" @click="emit('confirm')">
             확인
           </button>
-          <button
-            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
-            @click="emit('cancel')"
-          >
+          <button class="btn btn-sm btn-secondary px-6" @click="emit('cancel')">
             취소
           </button>
         </div>

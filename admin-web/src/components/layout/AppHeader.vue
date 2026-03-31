@@ -44,7 +44,7 @@ function handleLogout() {
     <div v-if="authStore.isLoggedIn" class="ml-auto flex items-center gap-3">
       <span class="text-sm text-gray-300">{{ authStore.adminId }}</span>
       <button
-        class="rounded border border-gray-600 px-3 py-1 text-xs text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+        class="rounded border border-gray-500 px-3 py-1 text-xs text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
         @click="handleLogout"
       >
         로그아웃

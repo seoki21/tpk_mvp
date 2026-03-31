@@ -76,7 +76,7 @@ async function handleSubmit() {
         <!-- 로그인 버튼 -->
         <button
           type="submit"
-          class="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          class="btn btn-primary w-full py-2"
           :disabled="loading"
         >
           {{ loading ? '로그인 중...' : '로그인' }}

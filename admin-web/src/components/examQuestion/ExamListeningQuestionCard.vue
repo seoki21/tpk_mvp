@@ -10,6 +10,14 @@
 import { reactive, computed } from 'vue';
 import { getDownloadUrl } from '@/api/examFile';
 
+const emit = defineEmits(['open-image-crop']);
+
+/** 이미지 생성 대상 여부 — is_question_image 또는 is_choices_image 중 하나라도 'Y'이면 true */
+function hasImageFlag() {
+  if (!props.parsed) return false;
+  return props.parsed.is_question_image === 'Y' || props.parsed.is_choices_image === 'Y';
+}
+
 const props = defineProps({
   /** 문항 항목 원본 (store.mergedItems의 항목) */
   item: { type: Object, required: true },
@@ -69,9 +77,9 @@ function parseFeedback(fb) {
 </script>
 
 <template>
-  <!-- 상단: {no}번 {section} {type} {score}점 -->
+  <!-- 상단: {no}번 {section} {type} {score}점 + 이미지 생성 버튼 -->
   <div class="mb-3 border-b border-gray-200 pb-2">
-    <div class="flex items-baseline gap-2 text-sm">
+    <div class="flex items-center gap-2 text-sm">
       <span class="font-bold text-gray-800">
         {{ item.question_no }}번
       </span>
@@ -93,6 +101,14 @@ function parseFeedback(fb) {
       >
         {{ parsed.score }}점
       </span>
+      <!-- 이미지 생성 버튼 — is_question_image 또는 is_choices_image가 'Y'인 경우 -->
+      <button
+        v-if="hasImageFlag()"
+        class="btn btn-xs btn-primary ml-auto"
+        @click="emit('open-image-crop', item)"
+      >
+        이미지 생성
+      </button>
     </div>
   </div>
 

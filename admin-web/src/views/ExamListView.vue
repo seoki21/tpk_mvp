@@ -141,7 +141,7 @@ onMounted(() => {
 <template>
   <div class="flex h-full flex-col">
     <!-- 서브 타이틀 -->
-    <h2 class="mb-4 text-xl font-bold text-gray-800">시험관리(기출)</h2>
+    <h2 class="mb-4 text-xl font-bold text-gray-800">시험 관리</h2>
 
     <!-- 검색바 -->
     <SearchBar @search="handleSearch" @register="handleRegister">

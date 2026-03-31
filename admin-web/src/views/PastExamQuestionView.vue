@@ -1,6 +1,6 @@
 <!--
-  기출문제 관리 페이지 (읽기 영역)
-  - 상단 조회조건: 기출문제 selectbox + 영역 selectbox + 파일 selectbox + 변환/저장 버튼
+  기출문항 관리 페이지 (읽기 영역)
+  - 상단 조회조건: 통합 selectbox (시험+영역+파일) + API 호출 버튼 + 전체 저장 버튼
   - 하단: 문제 목록(JSON → 화면) — 좌측 JSON 텍스트 + 우측 UI 렌더링
   - 마운트 시 기출문제 목록을 조회한다.
 -->
@@ -9,6 +9,8 @@ import { onMounted } from 'vue';
 import { useExamQuestionCommon } from '@/composables/useExamQuestionCommon';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import LocaleSelectDialog from '@/components/examQuestion/LocaleSelectDialog.vue';
+import ExamConvertPopup from '@/components/examQuestion/ExamConvertPopup.vue';
+import ImageCropPopup from '@/components/examQuestion/ImageCropPopup.vue';
 import ExamQuestionHeader from '@/components/examQuestion/ExamQuestionHeader.vue';
 import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
 import ExamQuestionCard from '@/components/examQuestion/ExamQuestionCard.vue';
@@ -21,20 +23,23 @@ const {
   /* JSON 편집 */
   getEditState, handleJsonEditFromPanel, setJsonTab,
   getActiveJsonText, getActiveJsonError,
-  /* 영역 필터 */
-  sectionOptionsForExam,
-  handleExamChange, handleSectionChange, handleFileChange,
-  handleConvertClick, handleJsonUploadSelect,
+  /* 통합 selectbox + API 호출 팝업 */
+  showConvertPopup,
+  handleCombinedChange, handleConvertClick,
+  handleConvertPopupClose, handleConvertPopupSaved,
   /* 저장 */
   handleSaveAll,
   /* 데이터 추출 */
-  getCorrectAnswer, getFeedbackData, getExamLabel,
+  getCorrectAnswer, getFeedbackData,
   /* 피드백 생성 (locale 선택 팝업) */
   feedbackGenerating, showLocaleDialog, existingFeedbackLocales, handleLocaleConfirm, handleLocaleCancel,
   handleGenerateFeedbackForItem,
   /* 단건 저장 */
   itemSaving, handleSaveItemSingle,
+  /* 이미지 crop 팝업 */
+  showImageCropPopup, imageCropItem, handleOpenImageCrop, handleImageCropClose,
   /* 기타 */
+  handleToggleJsonFilter,
   handleRetryExamOptions,
 } = useExamQuestionCommon();
 
@@ -47,19 +52,15 @@ onMounted(() => {
 <template>
   <div class="flex h-full flex-col">
     <!-- 서브 타이틀 -->
-    <h2 class="mb-4 text-xl font-bold text-gray-800">기출문제 관리</h2>
+    <h2 class="mb-4 text-xl font-bold text-gray-800">기출문항 관리</h2>
 
     <!-- 상단 조회조건 (공통 컴포넌트) -->
     <ExamQuestionHeader
       :store="store"
-      :section-options="sectionOptionsForExam"
-      :get-exam-label="getExamLabel"
-      @exam-change="handleExamChange"
-      @section-change="handleSectionChange"
-      @file-change="handleFileChange"
+      @combined-change="handleCombinedChange"
       @convert-click="handleConvertClick"
-      @json-upload="handleJsonUploadSelect"
       @save-all="handleSaveAll"
+      @toggle-json-filter="handleToggleJsonFilter"
       @retry-exam-options="handleRetryExamOptions"
     />
 
@@ -79,13 +80,7 @@ onMounted(() => {
           v-if="!store.loading && store.mergedItems.length === 0"
           class="flex h-40 items-center justify-center text-gray-400"
         >
-          {{
-            !store.selectedExamKey
-              ? '기출문제를 선택하세요.'
-              : !store.selectedPdfKey
-                ? '파일을 선택하세요.'
-                : '문제 데이터가 없습니다.'
-          }}
+          {{ !store.selectedExamKey ? '기출문제를 선택하세요.' : '문제 데이터가 없습니다.' }}
         </div>
 
         <!-- 로딩 -->
@@ -125,6 +120,7 @@ onMounted(() => {
                 :parsed="getEditState(item).parsed"
                 :correct-answer="getCorrectAnswer(item)"
                 :feedback-data="getFeedbackData(item)"
+                @open-image-crop="handleOpenImageCrop"
               />
             </div>
           </div>
@@ -146,6 +142,24 @@ onMounted(() => {
       :existing-locales="existingFeedbackLocales"
       @confirm="handleLocaleConfirm"
       @cancel="handleLocaleCancel"
+    />
+
+    <!-- API 호출 팝업 -->
+    <ExamConvertPopup
+      :visible="showConvertPopup"
+      :exam-key="store.selectedExamKey"
+      :pdf-key="store.selectedPdfKey"
+      @close="handleConvertPopupClose"
+      @saved="handleConvertPopupSaved"
+    />
+
+    <!-- 이미지 crop 팝업 -->
+    <ImageCropPopup
+      :visible="showImageCropPopup"
+      :exam-key="store.selectedExamKey"
+      :pdf-key="store.selectedPdfKey"
+      :item="imageCropItem"
+      @close="handleImageCropClose"
     />
   </div>
 </template>

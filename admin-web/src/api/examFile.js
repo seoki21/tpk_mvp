@@ -8,9 +8,10 @@ import api from './index';
 /**
  * 파일 목록 조회
  * @param {number} examKey - 시험키 PK
+ * @param {Object} [config] - Axios 요청 옵션 (skipProgress 등)
  */
-export function getFiles(examKey) {
-  return api.get(`/api/v1/exam-list/${examKey}/files`);
+export function getFiles(examKey, config) {
+  return api.get(`/api/v1/exam-list/${examKey}/files`, config);
 }
 
 /**

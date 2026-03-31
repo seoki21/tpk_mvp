@@ -51,23 +51,11 @@ const router = createRouter({
           name: 'pastExamListening',
           component: () => import('../views/PastExamListeningView.vue')
         },
-        /* 기출문항 변환(JSON) — 기출문제관리에서 진입 */
-        {
-          path: 'past-exam-questions/:examKey/:pdfKey/convert',
-          name: 'examConvert',
-          component: () => import('../views/ExamConvertView.vue')
-        },
-        /* 연습문제관리 */
+        /* 연습문항관리 */
         {
           path: 'practice-questions',
           name: 'practiceQuestions',
           component: () => import('../views/PracticeQuestionListView.vue')
-        },
-        /* 연습문제 생성(API) */
-        {
-          path: 'practice-questions/create',
-          name: 'practiceQuestionCreate',
-          component: () => import('../views/PracticeQuestionCreateView.vue')
         },
         {
           path: 'question-structures',

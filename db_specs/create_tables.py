@@ -243,7 +243,27 @@ sqls = [
     )
     """,
 
-    # 10. tb_history_exam : 학습 이력 - 시험
+    # 10. tb_practice_request : 연습문제 생성 요청
+    """
+    CREATE TABLE IF NOT EXISTS tb_practice_request (
+        request_key    SERIAL       NOT NULL,
+        exam_type      VARCHAR(20)  NOT NULL,
+        tpk_level      VARCHAR(10)  NOT NULL,
+        section        VARCHAR(20)  NOT NULL,
+        difficulty     VARCHAR(10),
+        question_count INTEGER      NOT NULL,
+        gen_method     VARCHAR(10)  NOT NULL,
+        status         VARCHAR(20)  NOT NULL DEFAULT 'requested',
+        del_yn         VARCHAR(1)   NOT NULL DEFAULT 'N',
+        ins_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_practice_request PRIMARY KEY (request_key)
+    )
+    """,
+
+    # 11. tb_history_exam : 학습 이력 - 시험
     """
     CREATE TABLE tb_history_exam (
         history_key    SERIAL       NOT NULL,

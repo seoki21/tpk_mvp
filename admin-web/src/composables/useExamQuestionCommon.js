@@ -3,7 +3,7 @@
  * - 읽기(PastExamQuestionView)와 듣기(PastExamListeningView) 화면에서 공유하는 로직을 제공한다.
  * - JSON 편집 상태 관리, 영역 필터, 저장, 피드백 생성 등 공통 기능을 포함한다.
  */
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
 import { bulkSave, generateFeedbackSingle, updateQuestionSingle } from '@/api/examQuestion';
@@ -135,30 +135,35 @@ export function useExamQuestionCommon() {
     return state.error;
   }
 
-  /* ========== 영역 필터 ========== */
+  /* ========== 통합 selectbox + API 호출 팝업 ========== */
 
-  /** 선택된 시험과 같은 (year, round, tpk_level)을 가진 시험들의 영역 목록 */
-  const sectionOptionsForExam = computed(() => {
-    const exam = store.selectedExam;
-    if (!exam) return [];
-    const siblings = store.examOptions.filter(
-      (e) => e.exam_year === exam.exam_year && e.round === exam.round && e.tpk_level === exam.tpk_level
-    );
-    const seen = new Set();
-    return siblings
-      .filter((e) => {
-        if (seen.has(e.section)) return false;
-        seen.add(e.section);
-        return true;
-      })
-      .map((e) => ({ code: e.section, name: e.section_name }));
-  });
+  /** API 호출 팝업 표시 여부 */
+  const showConvertPopup = ref(false);
 
-  /** 시험 선택 변경 — 선택된 시험의 영역에 따라 읽기/듣기 화면으로 라우트 분기 */
-  async function handleExamChange(event) {
-    const examKey = event.target.value ? Number(event.target.value) : null;
-    await store.selectExam(examKey);
-    /* 선택된 시험의 영역에 따라 라우트 분기 */
+  /**
+   * 통합 selectbox 변경 — examKey + pdfKey를 동시에 설정하고 데이터 조회
+   * 영역에 따라 읽기/듣기 화면으로 라우트 분기한다.
+   */
+  async function handleCombinedChange(examKey, pdfKey) {
+    if (!examKey || !pdfKey) {
+      store.selectedExamKey = null;
+      store.selectedPdfKey = null;
+      store.fileOptions = [];
+      store.questions = [];
+      store.instructions = [];
+      return;
+    }
+
+    /* 시험이 변경된 경우 파일/MP3 목록도 다시 로드 */
+    if (store.selectedExamKey !== examKey) {
+      await store.selectExam(examKey);
+    }
+    store.selectFile(pdfKey);
+
+    /* 문제/지시문 조회 */
+    await store.fetchQuestionsAndInstructions(examKey);
+
+    /* 영역에 따라 읽기/듣기 화면으로 라우트 분기 */
     if (store.selectedExam) {
       const targetRoute = store.selectedExam.section_name === '듣기' ? 'pastExamListening' : 'pastExamQuestions';
       const currentRoute = router.currentRoute.value.name;
@@ -168,63 +173,26 @@ export function useExamQuestionCommon() {
     }
   }
 
-  /**
-   * 영역 선택 변경 — 같은 그룹 내 해당 영역의 exam_key로 전환
-   * section_name에 따라 읽기/듣기 화면으로 라우트 분기한다.
-   */
-  async function handleSectionChange(event) {
-    const sectionCode = event.target.value || null;
-    if (!sectionCode || !store.selectedExam) return;
-
-    const currentExam = store.selectedExam;
-    const targetExam = store.examOptions.find(
-      (e) =>
-        e.exam_year === currentExam.exam_year &&
-        e.round === currentExam.round &&
-        e.tpk_level === currentExam.tpk_level &&
-        e.section === sectionCode
-    );
-    if (targetExam) {
-      /* 시험 전환 */
-      if (targetExam.exam_key !== store.selectedExamKey) {
-        await store.selectExam(targetExam.exam_key);
-      }
-      /* 영역에 따라 라우트 분기 (듣기 ↔ 읽기) */
-      const targetRoute = targetExam.section_name === '듣기' ? 'pastExamListening' : 'pastExamQuestions';
-      const currentRoute = router.currentRoute.value.name;
-      if (currentRoute !== targetRoute) {
-        router.push({ name: targetRoute });
-      }
+  /** API 호출 버튼 클릭 → 팝업 표시 */
+  function handleConvertClick() {
+    if (!store.selectedExamKey || !store.selectedPdfKey) {
+      toast.warning('기출문제를 먼저 선택하세요.');
+      return;
     }
+    showConvertPopup.value = true;
   }
 
-  /** 파일 선택 변경 */
-  async function handleFileChange(event) {
-    const pdfKey = event.target.value ? Number(event.target.value) : null;
-    store.selectFile(pdfKey);
+  /** API 호출 팝업 닫기 */
+  function handleConvertPopupClose() {
+    showConvertPopup.value = false;
+  }
+
+  /** API 호출 팝업에서 저장 완료 → 문제 목록 새로고침 */
+  async function handleConvertPopupSaved() {
+    showConvertPopup.value = false;
     if (store.selectedExamKey) {
       await store.fetchQuestionsAndInstructions(store.selectedExamKey);
     }
-  }
-
-  /** JSON 변환(일괄) 버튼 클릭 → 변환 페이지로 이동 */
-  function handleConvertClick() {
-    if (!store.selectedExamKey || !store.selectedPdfKey) {
-      toast.warning('기출문제와 파일을 먼저 선택하세요.');
-      return;
-    }
-    router.push({
-      name: 'examConvert',
-      params: { examKey: store.selectedExamKey, pdfKey: store.selectedPdfKey }
-    });
-  }
-
-  /** JSON 변환(업로드) 파일 선택 핸들러 */
-  function handleJsonUploadSelect(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    toast.info(`선택된 파일: ${file.name}\n(업로드 처리는 추후 구현 예정)`);
-    event.target.value = '';
   }
 
   /* ========== 저장 ========== */
@@ -478,6 +446,31 @@ export function useExamQuestionCommon() {
     showConfirm.value = true;
   }
 
+  /** JSON 미변환 필터 체크박스 토글 */
+  function handleToggleJsonFilter(checked) {
+    store.jsonFilterOnly = checked;
+  }
+
+  /* ========== 이미지 crop 팝업 ========== */
+
+  /** 이미지 crop 팝업 표시 여부 */
+  const showImageCropPopup = ref(false);
+
+  /** 이미지 crop 대상 문항 */
+  const imageCropItem = ref(null);
+
+  /** 이미지 생성 버튼 클릭 → crop 팝업 표시 */
+  function handleOpenImageCrop(item) {
+    imageCropItem.value = item;
+    showImageCropPopup.value = true;
+  }
+
+  /** 이미지 crop 팝업 닫기 */
+  function handleImageCropClose() {
+    showImageCropPopup.value = false;
+    imageCropItem.value = null;
+  }
+
   /** 기출문제 목록 재조회 */
   function handleRetryExamOptions() {
     store.fetchExamOptions();
@@ -498,13 +491,12 @@ export function useExamQuestionCommon() {
     setJsonTab,
     getActiveJsonText,
     getActiveJsonError,
-    /* 영역 필터 */
-    sectionOptionsForExam,
-    handleExamChange,
-    handleSectionChange,
-    handleFileChange,
+    /* 통합 selectbox + API 호출 팝업 */
+    showConvertPopup,
+    handleCombinedChange,
     handleConvertClick,
-    handleJsonUploadSelect,
+    handleConvertPopupClose,
+    handleConvertPopupSaved,
     /* 저장 */
     handleSaveAll,
     /* 데이터 추출 */
@@ -521,7 +513,13 @@ export function useExamQuestionCommon() {
     /* 단건 저장 */
     itemSaving,
     handleSaveItemSingle,
+    /* 이미지 crop 팝업 */
+    showImageCropPopup,
+    imageCropItem,
+    handleOpenImageCrop,
+    handleImageCropClose,
     /* 기타 */
+    handleToggleJsonFilter,
     handleRetryExamOptions,
   };
 }

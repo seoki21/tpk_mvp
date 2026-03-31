@@ -42,10 +42,8 @@ defineProps({
   <template v-if="parsed">
     <p
       v-if="parsed.question_text"
-      class="mb-2 text-sm leading-relaxed text-gray-800"
-    >
-      {{ parsed.question_text }}
-    </p>
+      class="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
+    >{{ parsed.question_text }}</p>
     <div
       v-if="parsed.choices && parsed.choices.length"
       class="mt-2 rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-700"

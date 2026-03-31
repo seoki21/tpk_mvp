@@ -28,12 +28,12 @@ const sortedGroupCodes = computed(() =>
 /* ========== 테이블 컬럼 정의 ========== */
 const columns = [
   { key: 'group_code', label: '그룹코드', width: '140px' },
-  { key: 'group_name', label: '그룹코드명', width: '140px', align: 'left' },
+  { key: 'group_name', label: '그룹코드명', width: '150px', align: 'left' },
   { key: 'code', label: '코드', width: '100px' },
-  { key: 'code_name', label: '코드명', width: '180px', align: 'left' },
-  { key: 'code_desc', label: '코드설명', width: '240px', align: 'left' },
-  { key: 'sort_order', label: '소팅순서', width: '100px' },
-  { key: 'del_yn', label: '삭제여부', width: '100px' },
+  { key: 'code_name', label: '코드명', width: '190px', align: 'left' },
+  { key: 'code_desc', label: '코드설명', width: '250px', align: 'left' },
+  { key: 'sort_order', label: '소팅순서', width: '90px' },
+  { key: 'del_yn', label: '삭제여부', width: '90px' },
   { key: 'ins_user', label: '생성자', width: '120px' },
   { key: 'ins_date', label: '생성시간', width: '180px' }
 ];

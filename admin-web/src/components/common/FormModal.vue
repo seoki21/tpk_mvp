@@ -69,15 +69,12 @@ function onModalClick(e) {
 
         <!-- 하단 버튼 바 -->
         <div class="flex items-center justify-center gap-3 border-t border-gray-200 px-6 py-4">
-          <button
-            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
-            @click="emit('save')"
-          >
+          <button class="btn btn-sm btn-primary px-6" @click="emit('save')">
             저장
           </button>
           <button
             v-if="showDelete"
-            class="rounded border border-gray-400 bg-gray-200 px-6 py-2 text-sm hover:bg-gray-300"
+            class="btn btn-sm btn-danger px-6"
             @click="emit('delete')"
           >
             삭제

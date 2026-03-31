@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ========== 공통 버튼 스타일 ========== */
+
+/* 버튼 베이스 — 모든 버튼 공통 속성 */
+.btn {
+  @apply inline-flex items-center justify-center rounded text-sm font-medium transition-colors
+         disabled:cursor-not-allowed;
+}
+
+/* 사이즈: 기본 */
+.btn-sm {
+  @apply px-4 py-1.5;
+}
+
+/* 사이즈: 작은 (좁은 공간용) */
+.btn-xs {
+  @apply px-2 py-0.5 text-xs;
+}
+
+/* Primary — 주요 액션 (저장, 생성, 로그인, API 호출) */
+.btn-primary {
+  @apply border border-blue-300 bg-blue-50 text-blue-600
+         hover:border-blue-400 hover:bg-blue-100
+         disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400;
+}
+
+/* Secondary — 보조 액션 (조회, 등록, 취소, 닫기, 복사, 다운로드) */
+.btn-secondary {
+  @apply border border-gray-300 bg-white text-gray-600
+         hover:border-gray-400 hover:bg-gray-50
+         disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400;
+}
+
+/* Danger — 위험 액션 (삭제) */
+.btn-danger {
+  @apply border border-red-300 bg-red-50 text-red-500
+         hover:border-red-400 hover:bg-red-100
+         disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400;
+}
+
+/* Ghost — 텍스트 전용 (재조회, 링크형 버튼) */
+.btn-ghost {
+  @apply border border-transparent text-gray-500
+         hover:bg-gray-50 hover:text-gray-700
+         disabled:text-gray-300 disabled:bg-transparent;
+}
+
+/* NProgress 프로그레스바 커스터마이징 — 상단 슬림 바 색상 */
+#nprogress .bar {
+  background: #3b82f6; /* blue-500 */
+  height: 3px;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #3b82f6, 0 0 5px #3b82f6;
+}
+
+/* 스피너를 화면 정중앙에 크게 표시 */
+#nprogress .spinner {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translate(-50%, -50%);
+  z-index: 1050;
+}
+
+#nprogress .spinner-icon {
+  width: 250px;
+  height: 250px;
+  border-width: 6px;
+  border-top-color: #3b82f6;
+  border-left-color: #3b82f6;
+}

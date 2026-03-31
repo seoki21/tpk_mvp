@@ -113,14 +113,14 @@ function syncScroll(event) {
         피드백
       </button>
       <button
-        class="ml-auto rounded border border-purple-300 bg-purple-50 px-2 py-0.5 text-[11px] text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+        class="btn btn-xs btn-primary ml-auto"
         :disabled="feedbackGenerating"
         @click="emit('generate-feedback')"
       >
         {{ feedbackGenerating ? '생성 중...' : '피드백 생성(API)' }}
       </button>
       <button
-        class="rounded border border-gray-300 bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+        class="btn btn-xs btn-secondary"
         :disabled="itemSaving"
         @click="emit('save-item')"
       >

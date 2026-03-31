@@ -87,7 +87,7 @@ def get_all_group_codes() -> list[dict]:
             SELECT group_code, group_name
               FROM tb_group_code
              WHERE del_yn = 'N'
-             ORDER BY group_name ASC
+             ORDER BY group_code DESC
             """
         )
         return cursor.fetchall()
