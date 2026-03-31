@@ -1,0 +1,44 @@
+name: Deploy admin Backend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH로 서버에 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+
+            cd /srv/tpk-mvp/admin/be
+
+            echo "최신 코드 반영"
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "가상환경 활성화"
+            source venv/bin/activate
+
+            echo ".env 파일 생성"
+            cat <<EOF > tpk_mvp/backend/.env
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            EOF
+
+            echo "backend 이동"
+            cd tpk_mvp/backend
+
+            echo "의존성 설치"
+            pip install -r requirements.txt
+
+            echo "서비스 재시작"
+            sudo systemctl restart tpk-admin-backend
+
+            echo "배포 완료"
