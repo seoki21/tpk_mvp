@@ -1,0 +1,68 @@
+name: Deploy admin Frontend
+on:
+  workflow_dispatch: 
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 1. GitHub Actions 서버에서 Node.js 환경 설정 및 빌드
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm' # 빌드 속도 향상을 위한 캐시 사용
+          cache-dependency-path: admin-web/package-lock.json
+
+      - name: 의존성 설치 및 빌드
+        run: |
+          cd admin-web
+          npm install
+          npm run build
+
+      # 2. 빌드 결과물(dist)을 서버의 임시 경로(dist_new)로 전송
+      - name: 빌드 파일 전송 (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "admin-web/dist/*"
+          target: "/srv/tpk-mvp/admin/admin-web/dist_new"
+          strip_components: 2
+
+      # 3. 서버에서 순식간에 폴더 이름을 바꿔서 무중단 배포 완료 (SSH)
+      - name: 무중단 폴더 교체 (Atomic Switch)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd /srv/tpk-mvp/admin/admin-web
+
+            # 기존 백업 폴더 제거 (있다면)
+            rm -rf dist_old
+
+            # 현재 서비스 중인 폴더를 백업으로 이름 변경
+            if [ -d "dist" ]; then
+              mv dist dist_old
+            fi
+
+            if [ -d "dist_new/dist" ]; then
+              mv dist_new/dist dist
+            else
+              mv dist_new dist
+            fi
+
+            # 임시 폴더 잔재 삭제
+            rm -rf dist_new
+
+            echo "배포 완료!"
