@@ -34,8 +34,7 @@ jobs:
             git reset --hard origin/main
 
             # 4. 백엔드 디렉터리로 이동
-            # 레포지토리 내부의 실제 경로에 맞춰 수정하세요 (예: admin/backend)
-            cd admin/backend
+            cd tpk_mvp/backend
 
             # 5. 가상환경 활성화 (이미 존재하는 venv 활용)
             if [ -d "venv" ]; then
