@@ -18,31 +18,43 @@ jobs:
           script: |
             set -e
 
-            if [ ! -d /srv/tpk-mvp/admin/.git ]; then
-              git clone https://github.com/${{ github.repository }}.git /srv/tpk-mvp/admin
-            fi
-
+            # 1. 경로 이동 및 권한 확인
             cd /srv/tpk-mvp/admin
 
+            # 2. .git이 없으면 초기화 및 원격 연결 (강제 연결 로직)
+            if [ ! -d ".git" ]; then
+              echo "Git 설정이 없어 새로 초기화합니다."
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git
+            fi
+
+            # 3. 코드 가져오기 (이미 파일이 있다면 fetch 후 reset)
             echo "최신 코드 반영"
-            git fetch origin
+            git fetch origin main
             git reset --hard origin/main
 
-            echo "가상환경 활성화"
-            source venv/bin/activate
+            # 4. 백엔드 디렉터리로 이동
+            # 레포지토리 내부의 실제 경로에 맞춰 수정하세요 (예: admin/backend)
+            cd admin/backend
 
-            echo ".env 파일 생성"
-            cat <<EOF > tpk_mvp/backend/.env
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            EOF
+            # 5. 가상환경 활성화 (이미 존재하는 venv 활용)
+            if [ -d "venv" ]; then
+              source venv/bin/activate
+            elif [ -d "../../venv" ]; then
+              # 현재 위치보다 상위에 venv가 있는 경우 (ls 결과 참고)
+              source ../../venv/bin/activate
+            else
+              echo "가상환경이 없어 생성합니다."
+              python3 -m venv venv
+              source venv/bin/activate
+            fi
 
-            echo "backend 이동"
-            cd tpk_mvp/backend
-
-            echo "의존성 설치"
+            # 6. .env 및 의존성 설치
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
+            pip install --upgrade pip
             pip install -r requirements.txt
 
-            echo "서비스 재시작"
+            # 7. 서비스 재시작
             sudo systemctl restart tpk-admin-backend
-
+            
             echo "배포 완료"
