@@ -18,7 +18,7 @@ jobs:
           script: |
             set -e
 
-            cd /srv/tpk-mvp/admin/be
+            cd /srv/tpk-mvp/admin/be/tpk_mvp
 
             echo "최신 코드 반영"
             git fetch origin
