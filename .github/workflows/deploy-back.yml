@@ -48,8 +48,14 @@ jobs:
               source venv/bin/activate
             fi
 
-            # 6. .env 및 의존성 설치
-            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" > .env
+            # 6. .env 파일 생성 (GitHub Secrets에서 주입)
+            cat > .env <<EOF
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            GOOGLE_AI_API_KEY=${{ secrets.GOOGLE_AI_API_KEY }}
+            GOOGLE_AI_MODEL=${{ secrets.GOOGLE_AI_MODEL }}
+            EOF
+            
             pip install --upgrade pip
             pip install -r requirements.txt
 
