@@ -24,9 +24,9 @@ _BASE_SELECT = """
            (SELECT COUNT(*)
               FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'mp3') AS mp3_count
       FROM tb_exam_list e
-      LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(e.exam_type AS INTEGER)
-      LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(e.tpk_level AS INTEGER)
-      LEFT JOIN tb_code sc ON sc.group_code = 'section' AND sc.code = CAST(e.section AS INTEGER)
+      LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(NULLIF(e.exam_type, '') AS INTEGER)
+      LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(NULLIF(e.tpk_level, '') AS INTEGER)
+      LEFT JOIN tb_code sc ON sc.group_code = 'section' AND sc.code = CAST(NULLIF(e.section, '') AS INTEGER)
 """
 
 
