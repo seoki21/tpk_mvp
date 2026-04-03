@@ -152,7 +152,7 @@ onMounted(() => {
           v-model="store.searchParams.exam_type"
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
-          <option value="">전체</option>
+          <option value=""></option>
           <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
@@ -166,7 +166,7 @@ onMounted(() => {
           v-model="store.searchParams.tpk_level"
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
-          <option value="">전체</option>
+          <option value=""></option>
           <option v-for="opt in store.tpkLevelOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
@@ -180,7 +180,7 @@ onMounted(() => {
           v-model="store.searchParams.section"
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
-          <option value="">전체</option>
+          <option value=""></option>
           <option v-for="opt in store.sectionOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
