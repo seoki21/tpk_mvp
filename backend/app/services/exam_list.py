@@ -57,8 +57,8 @@ def list_exam_list(
     try:
         cursor = conn.cursor()
 
-        # 동적 WHERE 조건 구성
-        conditions = []
+        # 동적 WHERE 조건 구성 (삭제된 항목은 항상 제외)
+        conditions = ["e.del_yn = 'N'"]
         params = []
 
         if exam_type:
@@ -74,9 +74,7 @@ def list_exam_list(
             conditions.append("e.round = %s")
             params.append(round)
 
-        where_clause = ""
-        if conditions:
-            where_clause = "WHERE " + " AND ".join(conditions)
+        where_clause = "WHERE " + " AND ".join(conditions)
 
         # 전체 건수 조회
         count_sql = f"SELECT COUNT(*) AS total FROM tb_exam_list e {where_clause}"
