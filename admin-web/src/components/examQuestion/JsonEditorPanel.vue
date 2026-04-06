@@ -7,7 +7,7 @@
 <script setup>
 import { ref } from 'vue';
 
-defineProps({
+const props = defineProps({
   /** 항목 타입: 'question' 또는 'instruction' */
   itemType: {
     type: String,
@@ -50,6 +50,12 @@ const emit = defineEmits([
 /** pre 요소 참조 (스크롤 동기화용) */
 const preRef = ref(null);
 
+/** 마지막 저장 이후 내용이 수정되었는지 여부 */
+const isDirty = ref(false);
+
+/** blur 시 저장 안내 문구 표시 여부 (수정됨 + JSON 오류 없음 + 포커스 이탈) */
+const showSaveHint = ref(false);
+
 /**
  * JSON 텍스트에 구문 강조 HTML을 적용한다.
  * 키(보라), 문자열 값(초록), 숫자(파랑), boolean/null(주황) 색상 적용.
@@ -69,9 +75,25 @@ function highlightJson(text) {
   );
 }
 
-/** 입력 핸들러 — 부모에게 변경된 텍스트 전달 */
+/** 입력 핸들러 — 부모에게 변경된 텍스트 전달 및 dirty 상태 활성화 */
 function handleInput(event) {
+  isDirty.value = true;
+  showSaveHint.value = false; // 입력 중에는 힌트 숨김
   emit('update:jsonText', event.target.value);
+}
+
+/** blur 핸들러 — 수정된 내용이 있고 JSON 오류가 없을 때 저장 안내 문구 표시 */
+function handleBlur() {
+  if (isDirty.value && !props.hasError) {
+    showSaveHint.value = true;
+  }
+}
+
+/** 저장 버튼 클릭 — dirty 상태 초기화 후 부모에게 save-item 이벤트 전달 */
+function handleSaveClick() {
+  isDirty.value = false;
+  showSaveHint.value = false;
+  emit('save-item');
 }
 
 /** textarea 스크롤 시 pre 오버레이의 스크롤을 동기화 */
@@ -122,7 +144,7 @@ function syncScroll(event) {
       <button
         class="btn btn-xs btn-secondary"
         :disabled="itemSaving"
-        @click="emit('save-item')"
+        @click="handleSaveClick"
       >
         {{ itemSaving ? '저장 중...' : '저장' }}
       </button>
@@ -144,12 +166,16 @@ function syncScroll(event) {
         spellcheck="false"
         class="absolute inset-0 h-full w-full resize-none whitespace-pre-wrap break-all bg-transparent p-2 font-mono text-xs leading-relaxed text-transparent caret-gray-800 outline-none"
         @input="handleInput"
+        @blur="handleBlur"
         @scroll="syncScroll"
       ></textarea>
     </div>
-    <!-- JSON 에러 표시 -->
+    <!-- JSON 에러 / 저장 안내 문구 (동시 표시 안 함) -->
     <span v-if="hasError" class="mt-1 block text-xs text-red-500">
       JSON 형식 오류
+    </span>
+    <span v-else-if="showSaveHint" class="mt-1 block text-xs text-amber-500">
+      수정사항을 반영하려면 저장이 필요합니다
     </span>
   </div>
 </template>
