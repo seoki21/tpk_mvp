@@ -43,8 +43,7 @@ const form = ref({
   code: '',
   code_name: '',
   code_desc: '',
-  sort_order: 0,
-  del_yn: 'N'
+  sort_order: 0
 });
 
 /** 모달이 열릴 때 폼 데이터를 초기화 */
@@ -59,8 +58,7 @@ watch(
           code: props.editData.code || '',
           code_name: props.editData.code_name || '',
           code_desc: props.editData.code_desc || '',
-          sort_order: props.editData.sort_order ?? 0,
-          del_yn: props.editData.del_yn || 'N'
+          sort_order: props.editData.sort_order ?? 0
         };
       } else {
         /* 등록 모드: 빈 폼으로 초기화 */
@@ -69,8 +67,7 @@ watch(
           code: '',
           code_name: '',
           code_desc: '',
-          sort_order: 0,
-          del_yn: 'N'
+          sort_order: 0
         };
       }
 
@@ -92,12 +89,11 @@ async function handleSave() {
       await codeStore.update(form.value.group_code, form.value.code, {
         code_name: form.value.code_name,
         code_desc: form.value.code_desc,
-        sort_order: form.value.sort_order,
-        del_yn: form.value.del_yn
+        sort_order: form.value.sort_order
       });
     } else {
       /* 등록 모드: code는 서버에서 자동채번하므로 전송하지 않음 */
-      const { code, del_yn, ...createData } = form.value;
+      const { code, ...createData } = form.value;
       await codeStore.create(createData);
     }
     toast.success('저장되었습니다');
@@ -207,17 +203,6 @@ function cancelDelete() {
         />
       </div>
 
-      <!-- 삭제여부 (수정 모드에서만 표시) -->
-      <div v-if="isEditMode" class="flex items-center">
-        <label class="w-28 shrink-0 text-sm font-medium text-gray-700"> 삭제여부 </label>
-        <select
-          v-model="form.del_yn"
-          class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="N">N</option>
-          <option value="Y">Y</option>
-        </select>
-      </div>
     </div>
   </FormModal>
 

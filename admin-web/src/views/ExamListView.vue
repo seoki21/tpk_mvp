@@ -42,6 +42,7 @@ const fileList = ref([]);
 const fileMenuVisible = ref(false);
 const fileMenuAnchorRect = ref(null);
 const fileMenuExamKey = ref(null);
+const fileMenuTypeLabel = ref('');
 
 /* ========== PDF 뷰어 상태 ========== */
 const pdfUrl = ref('');
@@ -115,6 +116,7 @@ async function handleFileClick(row, event, fileType) {
   }
 
   fileMenuExamKey.value = row.exam_key;
+  fileMenuTypeLabel.value = fileType.toUpperCase();
   fileMenuAnchorRect.value = event.target.getBoundingClientRect();
   fileMenuVisible.value = true;
 }
@@ -274,6 +276,7 @@ onMounted(() => {
     <FilePopupMenu
       :visible="fileMenuVisible"
       :files="fileList"
+      :file-type-label="fileMenuTypeLabel"
       :anchor-rect="fileMenuAnchorRect"
       @select="handleFileSelect"
       @close="handleFileMenuClose"

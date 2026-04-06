@@ -37,7 +37,7 @@ const loading = ref(false);
 /* ========== 모달 상태 ========== */
 const showModal = ref(false);
 const editData = ref(null);
-const form = ref({ admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' });
+const form = ref({ admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER' });
 const isEditMode = ref(false);
 
 /* ========== 삭제 확인 ========== */
@@ -67,7 +67,7 @@ function handleSearch() {
 function handleRegister() {
   isEditMode.value = false;
   editData.value = null;
-  form.value = { admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER', del_yn: 'N' };
+  form.value = { admin_id: '', password: '', passwordConfirm: '', admin_desc: '', role_code: 'MANAGER' };
   showModal.value = true;
 }
 
@@ -80,8 +80,7 @@ function handleRowClick(row) {
     password: '',
     passwordConfirm: '',
     admin_desc: row.admin_desc || '',
-    role_code: row.roles || 'MANAGER',
-    del_yn: row.del_yn || 'N'
+    role_code: row.roles || 'MANAGER'
   };
   showModal.value = true;
 }
@@ -97,7 +96,7 @@ async function handleSave() {
       }
     }
     if (isEditMode.value) {
-      const updateData = { admin_desc: form.value.admin_desc, del_yn: form.value.del_yn };
+      const updateData = { admin_desc: form.value.admin_desc };
       if (form.value.password) updateData.password = form.value.password;
       await adminApi.update(form.value.admin_id, updateData);
     } else {
@@ -237,13 +236,6 @@ onMounted(() => {
           <select v-model="form.role_code" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm">
             <option value="MANAGER">MANAGER</option>
             <option value="SUPER">SUPER</option>
-          </select>
-        </div>
-        <div v-if="isEditMode" class="flex items-center">
-          <label class="w-28 shrink-0 text-sm font-medium text-gray-700">삭제여부</label>
-          <select v-model="form.del_yn" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm">
-            <option value="N">N</option>
-            <option value="Y">Y</option>
           </select>
         </div>
       </div>

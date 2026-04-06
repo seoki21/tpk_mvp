@@ -53,7 +53,6 @@ const form = ref({
   tpk_level: '',
   round: '',
   section: '',
-  del_yn: 'N'
 });
 
 /* ========== PDF 파일 관련 상태 ========== */
@@ -97,8 +96,7 @@ watch(
           exam_type: props.editData.exam_type || '',
           tpk_level: props.editData.tpk_level || '',
           round: props.editData.round ?? '',
-          section: props.editData.section || '',
-          del_yn: props.editData.del_yn || 'N'
+          section: props.editData.section || ''
         };
         /* 수정 모드에서 파일 목록 로드 (PDF + JSON) */
         await loadFiles();
@@ -110,8 +108,7 @@ watch(
           exam_type: '',
           tpk_level: '',
           round: '',
-          section: '',
-          del_yn: 'N'
+          section: ''
         };
         fileList.value = [];
         jsonFileList.value = [];
@@ -269,8 +266,7 @@ async function handleSave() {
         exam_type: form.value.exam_type,
         tpk_level: form.value.tpk_level,
         round: form.value.round,
-        section: form.value.section,
-        del_yn: form.value.del_yn
+        section: form.value.section
       });
       examKey = form.value.exam_key;
     } else {
@@ -433,18 +429,6 @@ function cancelDelete() {
           <option v-for="opt in store.sectionOptions" :key="opt.code" :value="String(opt.code)">
             {{ opt.code_name }}
           </option>
-        </select>
-      </div>
-
-      <!-- 삭제여부 (수정 모드에서만 표시) -->
-      <div v-if="isEditMode" class="flex items-center">
-        <label class="w-28 shrink-0 text-sm font-medium text-gray-700">삭제여부</label>
-        <select
-          v-model="form.del_yn"
-          class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="N">N</option>
-          <option value="Y">Y</option>
         </select>
       </div>
 

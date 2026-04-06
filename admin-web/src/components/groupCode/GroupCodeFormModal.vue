@@ -41,7 +41,6 @@ const form = ref({
   group_code: '',
   group_name: '',
   group_desc: '',
-  del_yn: 'N'
 });
 
 /** 모달이 열릴 때 폼 데이터를 초기화 */
@@ -54,16 +53,14 @@ watch(
         form.value = {
           group_code: props.editData.group_code || '',
           group_name: props.editData.group_name || '',
-          group_desc: props.editData.group_desc || '',
-          del_yn: props.editData.del_yn || 'N'
+          group_desc: props.editData.group_desc || ''
         };
       } else {
         /* 등록 모드: 빈 폼으로 초기화 */
         form.value = {
           group_code: '',
           group_name: '',
-          group_desc: '',
-          del_yn: 'N'
+          group_desc: ''
         };
       }
     }
@@ -79,8 +76,7 @@ async function handleSave() {
     if (isEditMode.value) {
       await store.update(form.value.group_code, {
         group_name: form.value.group_name,
-        group_desc: form.value.group_desc,
-        del_yn: form.value.del_yn
+        group_desc: form.value.group_desc
       });
     } else {
       await store.create(form.value);
@@ -157,17 +153,6 @@ function cancelDelete() {
         />
       </div>
 
-      <!-- 삭제여부 (수정 모드에서만 표시) -->
-      <div v-if="isEditMode" class="flex items-center">
-        <label class="w-28 shrink-0 text-sm font-medium text-gray-700"> 삭제여부 </label>
-        <select
-          v-model="form.del_yn"
-          class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="N">N</option>
-          <option value="Y">Y</option>
-        </select>
-      </div>
     </div>
   </FormModal>
 

@@ -4,7 +4,7 @@
   - 읽기(PastExamQuestionView)와 듣기(PastExamListeningView) 화면에서 공유한다.
 -->
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { getInlineViewUrl } from '@/api/examFile';
 
 const props = defineProps({
@@ -19,6 +19,48 @@ const emit = defineEmits([
   'retry-exam-options',
   'toggle-json-filter',
 ]);
+
+/* ========== 파일선택 드롭다운 ========== */
+const showFileMenu = ref(false);
+
+/** 문항 JSON 파일 선택용 hidden input ref */
+const questionFileInput = ref(null);
+/** 피드백 JSON 파일 선택용 hidden input ref */
+const feedbackFileInput = ref(null);
+
+/**
+ * 서브메뉴 클릭 시 해당 file input 트리거
+ * @param {'question'|'feedback'} type - 파일 유형
+ */
+function handleFileMenuClick(type) {
+  showFileMenu.value = false;
+  if (type === 'question') {
+    questionFileInput.value?.click();
+  } else {
+    feedbackFileInput.value?.click();
+  }
+}
+
+/**
+ * 파일 선택 완료 후 처리 (미구현 상태 알림)
+ * @param {Event} event - change 이벤트
+ */
+function handleFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (file) {
+    alert('아직 미구현 상태입니다');
+  }
+  // 같은 파일 재선택 가능하도록 value 초기화
+  event.target.value = '';
+}
+
+/** 외부 클릭 시 파일선택 드롭다운 닫기 */
+function handleFileMenuOutsideClick() {
+  showFileMenu.value = false;
+}
+
+onMounted(() => document.addEventListener('click', handleFileMenuOutsideClick));
+onUnmounted(() => document.removeEventListener('click', handleFileMenuOutsideClick));
 
 /**
  * 통합 selectbox에서 선택된 값(examKey_pdfKey)을 파싱하여 emit
@@ -113,6 +155,53 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
       </svg>
     </button>
+
+    <!-- 파일선택 드롭다운 버튼 -->
+    <div class="relative">
+      <button
+        class="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-400 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+        :disabled="!store.selectedPdfKey"
+        @click.stop="showFileMenu = !showFileMenu"
+      >
+        JSON 파일 선택
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <!-- 서브메뉴 -->
+      <div
+        v-if="showFileMenu"
+        class="absolute right-0 z-10 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+      >
+        <button
+          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+          @click="handleFileMenuClick('question')"
+        >
+          문항 JSON 파일
+        </button>
+        <button
+          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+          @click="handleFileMenuClick('feedback')"
+        >
+          피드백 JSON 파일
+        </button>
+      </div>
+    </div>
+    <!-- 숨겨진 file input (문항 / 피드백) -->
+    <input
+      ref="questionFileInput"
+      type="file"
+      accept=".json"
+      class="hidden"
+      @change="handleFileSelected"
+    />
+    <input
+      ref="feedbackFileInput"
+      type="file"
+      accept=".json"
+      class="hidden"
+      @change="handleFileSelected"
+    />
 
     <!-- 전체 저장 버튼 (우측 끝 정렬) -->
     <button

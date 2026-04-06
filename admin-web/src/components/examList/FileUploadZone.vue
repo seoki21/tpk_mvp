@@ -153,7 +153,7 @@ const dragColorClass = {
 
     <!-- 드래그앤드롭 영역 -->
     <div
-      class="flex max-h-[200px] min-h-[100px] items-center justify-center overflow-y-auto rounded-lg border-2 border-dashed p-4 text-center transition-colors"
+      class="flex max-h-[150px] min-h-[50px] items-center justify-center overflow-y-auto rounded-lg border-2 border-dashed p-4 text-center transition-colors"
       :class="
         !enabled
           ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
