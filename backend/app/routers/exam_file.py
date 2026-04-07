@@ -87,6 +87,29 @@ async def upload_files(
         raise HTTPException(status_code=500, detail=f"파일 업로드 실패: {str(e)}")
 
 
+@router.get("/images/{filename}")
+def get_image(exam_key: int, filename: str):
+    """
+    crop된 이미지 파일을 서빙한다.
+    경로: uploads/exam/{exam_key}/{filename}
+    주의: /{pdf_key} 패턴보다 먼저 정의하여 라우트 충돌을 방지한다.
+    """
+    try:
+        full_path = os.path.join(UPLOAD_DIR, "exam", str(exam_key), filename)
+        if not os.path.exists(full_path):
+            raise HTTPException(status_code=404, detail="이미지 파일을 찾을 수 없습니다.")
+
+        return FileResponse(
+            path=full_path,
+            media_type="image/png",
+            content_disposition_type="inline",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이미지 조회 실패: {str(e)}")
+
+
 @router.delete("/{pdf_key}", response_model=BaseResponse, dependencies=[Depends(get_current_admin)])
 def delete_file(exam_key: int, pdf_key: int):
     """파일을 삭제한다. (소프트 삭제 + 파일 삭제)"""

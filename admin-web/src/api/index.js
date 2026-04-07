@@ -8,12 +8,17 @@
 import axios from 'axios';
 import NProgress from 'nprogress';
 
+/** 용도별 API 타임아웃 상수 (ms) */
+export const API_TIMEOUT = 30000;        // 일반 CRUD
+export const API_TIMEOUT_LONG = 60000;   // 대량 처리 (bulk-save 등)
+export const API_TIMEOUT_AI = 120000;    // AI/이미지 처리 (crop, 피드백 생성 등)
+
 /** 진행 중인 API 요청 수 (다중 요청 시 모두 완료될 때까지 프로그레스바 유지) */
 let activeRequests = 0;
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
-  timeout: 10000,
+  timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json'
   }

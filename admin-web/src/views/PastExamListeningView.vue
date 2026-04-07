@@ -10,7 +10,6 @@ import { useExamQuestionCommon } from '@/composables/useExamQuestionCommon';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import LocaleSelectDialog from '@/components/examQuestion/LocaleSelectDialog.vue';
 import ExamConvertPopup from '@/components/examQuestion/ExamConvertPopup.vue';
-import ImageCropPopup from '@/components/examQuestion/ImageCropPopup.vue';
 import ExamQuestionHeader from '@/components/examQuestion/ExamQuestionHeader.vue';
 import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
 import ExamListeningQuestionCard from '@/components/examQuestion/ExamListeningQuestionCard.vue';
@@ -36,8 +35,8 @@ const {
   handleGenerateFeedbackForItem,
   /* 단건 저장 */
   itemSaving, handleSaveItemSingle,
-  /* 이미지 crop 팝업 */
-  showImageCropPopup, imageCropItem, handleOpenImageCrop, handleImageCropClose,
+  /* 이미지 생성 */
+  imageGenerating, handleGenerateImages,
   /* 기타 */
   handleToggleJsonFilter,
   handleRetryExamOptions,
@@ -59,6 +58,7 @@ onMounted(() => {
       :store="store"
       @combined-change="handleCombinedChange"
       @convert-click="handleConvertClick"
+      @generate-images="handleGenerateImages"
       @save-all="handleSaveAll"
       @toggle-json-filter="handleToggleJsonFilter"
       @retry-exam-options="handleRetryExamOptions"
@@ -122,7 +122,6 @@ onMounted(() => {
                 :feedback-data="getFeedbackData(item)"
                 :mp3-file="store.mp3FileMap[item.question_no] || null"
                 :exam-key="store.selectedExamKey"
-                @open-image-crop="handleOpenImageCrop"
               />
             </div>
           </div>
@@ -155,13 +154,5 @@ onMounted(() => {
       @saved="handleConvertPopupSaved"
     />
 
-    <!-- 이미지 crop 팝업 -->
-    <ImageCropPopup
-      :visible="showImageCropPopup"
-      :exam-key="store.selectedExamKey"
-      :pdf-key="store.selectedPdfKey"
-      :item="imageCropItem"
-      @close="handleImageCropClose"
-    />
   </div>
 </template>

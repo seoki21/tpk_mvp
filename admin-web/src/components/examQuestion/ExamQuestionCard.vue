@@ -8,14 +8,6 @@
 <script setup>
 import { reactive } from 'vue';
 
-const emit = defineEmits(['open-image-crop']);
-
-/** 이미지 생성 대상 여부 — is_question_image 또는 is_choices_image 중 하나라도 'Y'이면 true */
-function hasImageFlag() {
-  if (!props.parsed) return false;
-  return props.parsed.is_question_image === 'Y' || props.parsed.is_choices_image === 'Y';
-}
-
 const props = defineProps({
   /** 문항 항목 원본 (store.mergedItems의 항목) */
   item: {
@@ -63,6 +55,34 @@ function getActiveFeedbackList() {
   const activeKey = getActiveFeedbackTab();
   const tab = props.feedbackData.tabs.find((t) => t.key === activeKey);
   return tab ? tab.list : [];
+}
+
+/**
+ * 선택지 문자열이 이미지 경로인지 판별한다.
+ * 동그라미 번호(① 등) 접두사를 제거한 뒤 .png/.jpg/.webp 확장자 여부 확인
+ */
+function isChoiceImage(choice) {
+  if (!choice || typeof choice !== 'string') return false;
+  const text = choice.replace(/^[①②③④⑤⑥⑦⑧⑨❶❷❸❹❺]\s*/, '').trim();
+  return /\.(png|jpg|jpeg|webp)$/i.test(text);
+}
+
+/**
+ * 선택지 문자열에서 이미지 파일명을 추출한다.
+ * "① 5_1_ans_1.png" → "5_1_ans_1.png"
+ */
+function getChoiceImageFilename(choice) {
+  return choice.replace(/^[①②③④⑤⑥⑦⑧⑨❶❷❸❹❺]\s*/, '').trim();
+}
+
+/**
+ * 이미지 파일명을 실제 접근 URL로 변환한다.
+ * exam_key를 기반으로 uploads 경로를 생성한다.
+ */
+function getImageUrl(filename) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const examKey = props.item.exam_key;
+  return `${baseUrl}/api/v1/exam-list/${examKey}/files/images/${filename}`;
 }
 
 /** 동그라미 번호(①②③④) → 숫자 매핑 */
@@ -114,25 +134,43 @@ function parseFeedback(fb) {
       >
         {{ parsed.score }}점
       </span>
-      <!-- 이미지 생성 버튼 — is_question_image 또는 is_choices_image가 'Y'인 경우 -->
-      <button
-        v-if="hasImageFlag()"
-        class="btn btn-xs btn-primary ml-auto"
-        @click="emit('open-image-crop', item)"
-      >
-        이미지 생성
-      </button>
     </div>
   </div>
   <!-- 본문 -->
   <template v-if="parsed">
+    <!-- 문항 이미지 (question_img) — 문항번호 바로 아래 -->
+    <div v-if="parsed.question_img" class="mb-3">
+      <img
+        :src="getImageUrl(parsed.question_img)"
+        :alt="`문항 ${item.question_no} 이미지`"
+        class="max-w-full rounded border border-gray-200"
+      />
+    </div>
     <p
       v-if="parsed.question_text"
       class="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
     >{{ item.question_no }}. {{ parsed.question_text }}</p>
-    <!-- 선택지 (정답 번호와 일치하는 선택지는 피드백 정답과 동일 스타일 적용) -->
+    <!-- 선택지: 이미지 선택지 (2열 그리드, 번호 옆에 이미지 가로 배치) -->
     <div
-      v-if="parsed.choices"
+      v-if="parsed.choices && parsed.choices.length && isChoiceImage(parsed.choices[0])"
+      class="mb-2 grid grid-cols-2 gap-2"
+    >
+      <div
+        v-for="(choice, ci) in parsed.choices"
+        :key="ci"
+        class="flex items-center gap-2 rounded border p-1"
+        :class="ci + 1 === Number(correctAnswer) ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
+      >
+        <span class="shrink-0 text-sm font-medium text-gray-500">{{ String.fromCodePoint(0x2460 + ci) }}</span>
+        <img
+          :src="getImageUrl(getChoiceImageFilename(choice))"
+          :alt="`선택지 ${ci + 1}`"
+          class="min-w-0 flex-1"
+        />
+      </div>
+    </div>
+    <div
+      v-else-if="parsed.choices"
       class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
     >
       <span

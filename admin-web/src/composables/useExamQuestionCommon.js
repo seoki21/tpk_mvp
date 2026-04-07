@@ -6,7 +6,7 @@
 import { ref, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
-import { bulkSave, generateFeedbackSingle, updateQuestionSingle } from '@/api/examQuestion';
+import { bulkSave, generateFeedbackSingle, updateQuestionSingle, cropImages, renameCropImages } from '@/api/examQuestion';
 import { useToast } from '@/composables/useToast';
 
 export function useExamQuestionCommon() {
@@ -451,24 +451,128 @@ export function useExamQuestionCommon() {
     store.jsonFilterOnly = checked;
   }
 
-  /* ========== 이미지 crop 팝업 ========== */
+  /* ========== 이미지 생성 (PDF crop) ========== */
 
-  /** 이미지 crop 팝업 표시 여부 */
-  const showImageCropPopup = ref(false);
+  /** 이미지 생성 처리 중 상태 */
+  const imageGenerating = ref(false);
 
-  /** 이미지 crop 대상 문항 */
-  const imageCropItem = ref(null);
+  /**
+   * "이미지 생성" 버튼 클릭 핸들러
+   * 1. PDF에서 이미지 영역을 OpenCV로 자동 검출/crop (백엔드 API)
+   * 2. 현재 mergedItems에서 이미지 포함 문항을 식별 (is_question_image/is_choices_image)
+   * 3. crop 결과와 문항을 자동 매칭
+   * 4. JSON에 question_img, choices 이미지 경로 업데이트
+   */
+  function handleGenerateImages() {
+    if (!store.selectedExamKey || !store.selectedPdfKey) {
+      toast.warning('기출문제를 먼저 선택하세요.');
+      return;
+    }
+    if (store.mergedItems.length === 0) {
+      toast.warning('문항 데이터가 없습니다. JSON 변환을 먼저 진행하세요.');
+      return;
+    }
 
-  /** 이미지 생성 버튼 클릭 → crop 팝업 표시 */
-  function handleOpenImageCrop(item) {
-    imageCropItem.value = item;
-    showImageCropPopup.value = true;
+    confirmMessage.value = '문항과 문제 이미지를 자동 생성하시겠습니까?';
+    confirmCallback.value = () => _executeGenerateImages();
+    showConfirm.value = true;
   }
 
-  /** 이미지 crop 팝업 닫기 */
-  function handleImageCropClose() {
-    showImageCropPopup.value = false;
-    imageCropItem.value = null;
+  /** 이미지 생성 실행 (컨펌 후 호출) */
+  async function _executeGenerateImages() {
+    /* 이미지 포함 문항 식별 */
+    const imageItems = [];
+    for (const item of store.mergedItems) {
+      const state = getEditState(item);
+      const parsed = state.parsed;
+      if (!parsed) continue;
+
+      const hasQuestionImg = parsed.is_question_image === 'Y';
+      const hasChoicesImg = parsed.is_choices_image === 'Y';
+      if (hasQuestionImg || hasChoicesImg) {
+        imageItems.push({
+          item,
+          state,
+          parsed,
+          hasQuestionImg,
+          hasChoicesImg,
+          no: item._type === 'question' ? item.question_no : (parsed.no_list ? parsed.no_list[0] : item.ins_no),
+        });
+      }
+    }
+
+    if (imageItems.length === 0) {
+      toast.info('이미지가 포함된 문항이 없습니다.');
+      return;
+    }
+
+    imageGenerating.value = true;
+    try {
+      /* 1. 백엔드 crop API 호출 */
+      const res = await cropImages(store.selectedExamKey, store.selectedPdfKey);
+      const cropResults = res.data || [];
+
+      if (cropResults.length === 0) {
+        toast.warning('PDF에서 이미지를 검출하지 못했습니다.');
+        return;
+      }
+
+      /* 2. 자동 매칭: 이미지 문항 순서와 crop 결과 순서를 매핑 */
+      const examKey = store.selectedExamKey;
+      const renameMap = [];
+      let cropIdx = 0;
+
+      for (const imgItem of imageItems) {
+        const no = imgItem.no;
+
+        if (imgItem.hasChoicesImg) {
+          /* 답안 이미지: 4개 박스를 순서대로 매핑 (2x2 그리드) */
+          const choiceCount = imgItem.parsed.choices ? imgItem.parsed.choices.length : 4;
+          const newChoices = [];
+
+          for (let i = 0; i < choiceCount; i++) {
+            if (cropIdx >= cropResults.length) break;
+            const crop = cropResults[cropIdx];
+            const newFilename = `ans_${examKey}_${no}_${i + 1}.png`;
+            renameMap.push({ old_filename: crop.filename, new_filename: newFilename });
+            /* ① ② ③ ④ 기호 접두사 유지 */
+            const circleNum = String.fromCodePoint(0x2460 + i);
+            newChoices.push(`${circleNum} ${newFilename}`);
+            cropIdx++;
+          }
+
+          /* JSON 업데이트: choices를 이미지 경로로 교체 */
+          imgItem.parsed.choices = newChoices;
+        }
+
+        if (imgItem.hasQuestionImg) {
+          /* 문항 이미지: 1개 박스 매핑 */
+          if (cropIdx < cropResults.length) {
+            const crop = cropResults[cropIdx];
+            const newFilename = `qst_${examKey}_${no}.png`;
+            renameMap.push({ old_filename: crop.filename, new_filename: newFilename });
+            imgItem.parsed.question_img = newFilename;
+            cropIdx++;
+          }
+        }
+
+        /* 편집 상태에 반영 */
+        imgItem.state.text = JSON.stringify(imgItem.parsed, null, 2);
+        imgItem.state.parsed = imgItem.parsed;
+        imgItem.state.error = false;
+      }
+
+      /* 3. 파일명 일괄 변경 (백엔드) */
+      if (renameMap.length > 0) {
+        await renameCropImages(examKey, renameMap);
+      }
+
+      toast.success(`이미지 ${renameMap.length}개 생성 완료. 전체 저장을 눌러주세요.`);
+    } catch (error) {
+      toast.error(error.detail || '이미지 생성에 실패했습니다.');
+    } finally {
+      imageGenerating.value = false;
+    }
   }
 
   /** 기출문제 목록 재조회 */
@@ -513,11 +617,9 @@ export function useExamQuestionCommon() {
     /* 단건 저장 */
     itemSaving,
     handleSaveItemSingle,
-    /* 이미지 crop 팝업 */
-    showImageCropPopup,
-    imageCropItem,
-    handleOpenImageCrop,
-    handleImageCropClose,
+    /* 이미지 생성 */
+    imageGenerating,
+    handleGenerateImages,
     /* 기타 */
     handleToggleJsonFilter,
     handleRetryExamOptions,

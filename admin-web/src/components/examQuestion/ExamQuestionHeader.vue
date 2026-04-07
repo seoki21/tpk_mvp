@@ -15,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits([
   'combined-change',
   'convert-click',
+  'generate-images',
   'save-all',
   'retry-exam-options',
   'toggle-json-filter',
@@ -187,6 +188,18 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
         </button>
       </div>
     </div>
+    <!-- 이미지 생성 버튼 -->
+    <button
+      class="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-4 py-1.5 text-sm font-medium text-green-600 transition-colors hover:border-green-400 hover:bg-green-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+      :disabled="!store.selectedPdfKey || store.mergedItems.length === 0"
+      @click="emit('generate-images')"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
+      </svg>
+      이미지 생성
+    </button>
+
     <!-- 숨겨진 file input (문항 / 피드백) -->
     <input
       ref="questionFileInput"

@@ -3,7 +3,7 @@
  * - 기출문제 관리 화면에서 사용하는 API 호출 함수를 정의한다.
  * - 문제/지시문 조회, 일괄 저장, PDF→JSON 변환(SSE 스트리밍) 기능을 제공한다.
  */
-import api from './index';
+import api, { API_TIMEOUT_LONG, API_TIMEOUT_AI } from './index';
 
 /**
  * 특정 시험의 문제 + 지시문 목록 조회
@@ -20,7 +20,7 @@ export function getQuestionsAndInstructions(examKey, config) {
  * @param {Object} data - { questions: [...], instructions: [...] }
  */
 export function bulkSave(examKey, data) {
-  return api.post(`/api/v1/exam-list/${examKey}/questions/bulk-save`, data);
+  return api.post(`/api/v1/exam-list/${examKey}/questions/bulk-save`, data, { timeout: API_TIMEOUT_LONG });
 }
 
 /**
@@ -48,7 +48,7 @@ export function generateFeedbackSingle(questionJson, aiProvider = 'claude', loca
     ai_provider: aiProvider,
     locales,
     section,
-  }, { timeout: 120000 });
+  }, { timeout: API_TIMEOUT_AI });
 }
 
 /**
@@ -77,6 +77,24 @@ export function updateQuestionSingle(examKey, questionNo, questionJson, feedback
     question_json: questionJson,
     feedback_json: feedbackJson,
   });
+}
+
+/**
+ * PDF에서 이미지 영역을 자동 검출하여 crop한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {number} pdfKey - PDF 파일키 PK
+ */
+export function cropImages(examKey, pdfKey) {
+  return api.post(`/api/v1/exam-list/${examKey}/images/crop`, { pdf_key: pdfKey }, { timeout: API_TIMEOUT_AI });
+}
+
+/**
+ * crop된 이미지 파일명을 최종 파일명으로 일괄 변경한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {Array} renameMap - [{ old_filename, new_filename }, ...]
+ */
+export function renameCropImages(examKey, renameMap) {
+  return api.post(`/api/v1/exam-list/${examKey}/images/rename`, { rename_map: renameMap });
 }
 
 /**
