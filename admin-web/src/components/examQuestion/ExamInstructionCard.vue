@@ -46,15 +46,10 @@ function getImageUrl(filename) {
     </div>
     <div v-else class="flex items-baseline gap-2 text-sm">
       <span class="font-bold text-gray-800">지시문 {{ item.ins_no }}</span>
-      <span
-        v-if="parsed && parsed.no_list && parsed.no_list.length"
-        class="text-gray-500"
-      >
+      <span v-if="parsed && parsed.no_list && parsed.no_list.length" class="text-gray-500">
         [{{ parsed.no_list.join(', ') }}]
       </span>
-      <span v-if="parsed && parsed.score" class="text-gray-500">
-        {{ parsed.score }}점
-      </span>
+      <span v-if="parsed && parsed.score" class="text-gray-500"> {{ parsed.score }}점 </span>
     </div>
   </div>
   <!-- 본문 -->
@@ -70,7 +65,9 @@ function getImageUrl(filename) {
     <p
       v-if="parsed.question_text"
       class="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
-    >{{ parsed.question_text }}</p>
+    >
+      {{ parsed.question_text }}
+    </p>
     <!-- 선택지: 이미지 (2열 그리드, 번호 옆에 이미지 가로 배치) -->
     <div
       v-if="parsed.choices && parsed.choices.length && isChoiceImage(parsed.choices[0])"
@@ -81,7 +78,9 @@ function getImageUrl(filename) {
         :key="ci"
         class="flex items-center gap-2 rounded border border-gray-200 p-1"
       >
-        <span class="shrink-0 text-sm font-medium text-gray-500">{{ String.fromCodePoint(0x2460 + ci) }}</span>
+        <span class="shrink-0 text-sm font-medium text-gray-500">{{
+          String.fromCodePoint(0x2460 + ci)
+        }}</span>
         <img
           :src="getImageUrl(getChoiceImageFilename(choice))"
           :alt="`선택지 ${ci + 1}`"

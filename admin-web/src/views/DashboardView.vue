@@ -9,15 +9,31 @@ import { onMounted, ref } from 'vue';
 import { Bar, Doughnut, Line } from 'vue-chartjs';
 import {
   Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement, ArcElement,
-  PointElement, LineElement, Title, Tooltip, Legend, Filler
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
 } from 'chart.js';
 import * as dashboardApi from '@/api/dashboard';
 
 /* Chart.js 컴포넌트 등록 */
 ChartJS.register(
-  CategoryScale, LinearScale, BarElement, ArcElement,
-  PointElement, LineElement, Title, Tooltip, Legend, Filler
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
 );
 
 /* ========== 상태 ========== */
@@ -65,11 +81,13 @@ function getLevelChartData() {
   const dist = examStats.value.level_distribution;
   return {
     labels: dist.map((d) => d.label),
-    datasets: [{
-      label: '시험 수',
-      data: dist.map((d) => d.count),
-      backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-    }]
+    datasets: [
+      {
+        label: '시험 수',
+        data: dist.map((d) => d.count),
+        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+      }
+    ]
   };
 }
 
@@ -79,10 +97,12 @@ function getSectionChartData() {
   const dist = examStats.value.section_distribution;
   return {
     labels: dist.map((d) => d.label),
-    datasets: [{
-      data: dist.map((d) => d.count),
-      backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-    }]
+    datasets: [
+      {
+        data: dist.map((d) => d.count),
+        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+      }
+    ]
   };
 }
 
@@ -100,7 +120,7 @@ function getApiChartData() {
   });
   const dates = Object.keys(dateMap).sort();
   return {
-    labels: dates.map((d) => d.substring(5)), /* MM-DD 형식 */
+    labels: dates.map((d) => d.substring(5)) /* MM-DD 형식 */,
     datasets: [
       {
         label: 'Input Tokens',
@@ -123,10 +143,19 @@ function getApiChartData() {
 }
 
 /** 차트 공통 옵션 */
-const barOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
-const doughnutOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } };
+const barOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } }
+};
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' } }
+};
 const lineOptions = {
-  responsive: true, maintainAspectRatio: false,
+  responsive: true,
+  maintainAspectRatio: false,
   plugins: { legend: { position: 'top' } },
   scales: { y: { beginAtZero: true } }
 };
@@ -134,9 +163,7 @@ const lineOptions = {
 /** 기간별 총 비용 합계 */
 function getTotalCost() {
   if (!apiUsage.value?.provider_summary?.length) return '0.000000';
-  return apiUsage.value.provider_summary
-    .reduce((sum, p) => sum + p.cost_usd, 0)
-    .toFixed(6);
+  return apiUsage.value.provider_summary.reduce((sum, p) => sum + p.cost_usd, 0).toFixed(6);
 }
 
 onMounted(fetchAll);
@@ -147,7 +174,9 @@ onMounted(fetchAll);
     <h2 class="text-xl font-bold text-gray-800">대시보드</h2>
 
     <!-- 로딩 -->
-    <div v-if="loading" class="flex h-40 items-center justify-center text-gray-400">데이터 로딩 중...</div>
+    <div v-if="loading" class="flex h-40 items-center justify-center text-gray-400">
+      데이터 로딩 중...
+    </div>
 
     <template v-else>
       <!-- ========== 상단 요약 카드 ========== -->
@@ -166,7 +195,9 @@ onMounted(fetchAll);
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <p class="text-sm text-gray-500">금월 API 호출</p>
-          <p class="mt-1 text-2xl font-bold text-blue-600">{{ summary?.monthly_api_calls ?? '-' }}</p>
+          <p class="mt-1 text-2xl font-bold text-blue-600">
+            {{ summary?.monthly_api_calls ?? '-' }}
+          </p>
         </div>
       </div>
 
@@ -214,9 +245,7 @@ onMounted(fetchAll);
         <!-- 사용자 학습 이력 (준비 중) -->
         <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <h3 class="mb-4 font-medium text-gray-700">사용자 학습 이력</h3>
-          <div class="flex h-[220px] items-center justify-center text-gray-300">
-            준비 중
-          </div>
+          <div class="flex h-[220px] items-center justify-center text-gray-300">준비 중</div>
         </div>
       </div>
 
@@ -228,10 +257,18 @@ onMounted(fetchAll);
             <!-- 기간 선택 -->
             <div class="flex gap-1">
               <button
-                v-for="p in [{ key: 'daily', label: '일별' }, { key: 'weekly', label: '주별' }, { key: 'monthly', label: '월별' }]"
+                v-for="p in [
+                  { key: 'daily', label: '일별' },
+                  { key: 'weekly', label: '주별' },
+                  { key: 'monthly', label: '월별' }
+                ]"
                 :key="p.key"
                 class="rounded px-3 py-1 text-xs transition-colors"
-                :class="apiPeriod === p.key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                :class="
+                  apiPeriod === p.key
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                "
                 @click="changeApiPeriod(p.key)"
               >
                 {{ p.label }}
@@ -268,7 +305,8 @@ onMounted(fetchAll);
             <p class="text-sm">
               <span class="font-semibold text-gray-700">{{ ps.call_count }}회</span>
               <span class="ml-2 text-gray-400">
-                In {{ (ps.input_tokens / 1000).toFixed(1) }}K / Out {{ (ps.output_tokens / 1000).toFixed(1) }}K
+                In {{ (ps.input_tokens / 1000).toFixed(1) }}K / Out
+                {{ (ps.output_tokens / 1000).toFixed(1) }}K
               </span>
             </p>
             <p class="text-xs text-green-600">${{ ps.cost_usd.toFixed(4) }}</p>
@@ -300,7 +338,11 @@ onMounted(fetchAll);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="c in apiUsage.recent_calls" :key="c.usage_key" class="border-b border-gray-100">
+              <tr
+                v-for="c in apiUsage.recent_calls"
+                :key="c.usage_key"
+                class="border-b border-gray-100"
+              >
                 <td class="py-1.5 text-gray-600">{{ c.ins_date }}</td>
                 <td class="py-1.5">{{ c.api_type }}</td>
                 <td class="py-1.5">{{ c.ai_provider }}</td>

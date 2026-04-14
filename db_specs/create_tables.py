@@ -208,42 +208,8 @@ sqls = [
     )
     """,
 
-    # 8. tb_practice_question : 연습 문항
-    """
-    CREATE TABLE tb_practice_question (
-        question_no    SERIAL       NOT NULL,
-        section        VARCHAR(20),
-        question_type  VARCHAR(20),
-        struct_type    VARCHAR(20),
-        question_json  TEXT,
-        score          INTEGER,
-        difficulty     VARCHAR(10),
-        confirm_yn     VARCHAR(1)   DEFAULT 'N',
-        del_yn         VARCHAR(1)   NOT NULL DEFAULT 'N',
-        ins_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        ins_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
-        upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
-        CONSTRAINT pk_practice_question PRIMARY KEY (question_no)
-    )
-    """,
-
-    # 9. tb_practice_answer : 연습 문항 정답
-    """
-    CREATE TABLE tb_practice_answer (
-        question_no    INTEGER      NOT NULL,
-        feedback_json  TEXT,
-        del_yn         VARCHAR(1)   NOT NULL DEFAULT 'N',
-        ins_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        ins_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
-        upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
-        CONSTRAINT pk_practice_answer PRIMARY KEY (question_no),
-        CONSTRAINT fk_practice_answer_question FOREIGN KEY (question_no) REFERENCES tb_practice_question(question_no)
-    )
-    """,
-
-    # 10. tb_practice_request : 연습문제 생성 요청
+    # 8. tb_practice_request : 연습문제 생성 요청
+    # 관리자가 AI/수동으로 연습문제 생성을 요청하는 단위. status로 처리 상태 관리.
     """
     CREATE TABLE IF NOT EXISTS tb_practice_request (
         request_key    SERIAL       NOT NULL,
@@ -260,6 +226,65 @@ sqls = [
         upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
         upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
         CONSTRAINT pk_practice_request PRIMARY KEY (request_key)
+    )
+    """,
+
+    # 9. tb_practice_list : 연습문제 묶음
+    # tb_exam_list와 대칭 구조. tb_practice_request의 결과물을 묶는 단위.
+    # request_key는 요청 기반 생성 시 참조, 수동 직접 등록이면 NULL 허용.
+    """
+    CREATE TABLE IF NOT EXISTS tb_practice_list (
+        practice_key  SERIAL       NOT NULL,
+        request_key   INTEGER,
+        exam_type     VARCHAR(20)  NOT NULL,
+        tpk_level     VARCHAR(10),
+        section       VARCHAR(20),
+        del_yn        VARCHAR(1)   NOT NULL DEFAULT 'N',
+        ins_date      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user      VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        upd_date      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        upd_user      VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_practice_list PRIMARY KEY (practice_key),
+        CONSTRAINT fk_practice_list_request
+            FOREIGN KEY (request_key) REFERENCES tb_practice_request(request_key)
+    )
+    """,
+
+    # 10. tb_practice_question : 연습 문항
+    """
+    CREATE TABLE tb_practice_question (
+        question_no    SERIAL       NOT NULL,
+        practice_key   INTEGER,
+        section        VARCHAR(20),
+        question_type  VARCHAR(20),
+        struct_type    VARCHAR(20),
+        question_json  TEXT,
+        score          INTEGER,
+        difficulty     VARCHAR(10),
+        confirm_yn     VARCHAR(1)   DEFAULT 'N',
+        del_yn         VARCHAR(1)   NOT NULL DEFAULT 'N',
+        ins_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_practice_question PRIMARY KEY (question_no),
+        CONSTRAINT fk_practice_question_list
+            FOREIGN KEY (practice_key) REFERENCES tb_practice_list(practice_key)
+    )
+    """,
+
+    # 11. tb_practice_answer : 연습 문항 정답
+    """
+    CREATE TABLE tb_practice_answer (
+        question_no    INTEGER      NOT NULL,
+        feedback_json  TEXT,
+        del_yn         VARCHAR(1)   NOT NULL DEFAULT 'N',
+        ins_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ins_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        upd_date       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        upd_user       VARCHAR(50)  NOT NULL DEFAULT 'admin',
+        CONSTRAINT pk_practice_answer PRIMARY KEY (question_no),
+        CONSTRAINT fk_practice_answer_question FOREIGN KEY (question_no) REFERENCES tb_practice_question(question_no)
     )
     """,
 

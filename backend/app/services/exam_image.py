@@ -1,7 +1,7 @@
 """
 시험 이미지 crop 서비스 모듈
 PDF 페이지에서 OpenCV를 이용하여 그림 영역(일러스트, 광고, 그래프 등)을 자동 검출하고 crop한다.
-검출된 이미지를 uploads/exam/{exam_key}/images/ 하위에 저장한다.
+검출된 이미지를 Cloudflare R2에 업로드한다.
 """
 import os
 import cv2
@@ -11,7 +11,7 @@ from PIL import Image
 from io import BytesIO
 
 from app.database import get_connection
-from app.config import UPLOAD_DIR
+from app.services import r2_storage
 
 
 def _get_pdf_file_info(exam_key: int, pdf_key: int) -> dict:
@@ -47,20 +47,9 @@ def _get_pdf_file_info(exam_key: int, pdf_key: int) -> dict:
         conn.close()
 
 
-def _ensure_image_dir(exam_key: int) -> str:
-    """
-    시험별 이미지 저장 디렉토리를 생성하고 경로를 반환한다.
-    구조: {UPLOAD_DIR}/exam/{exam_key}/images/
-
-    Args:
-        exam_key: 시험 PK
-
-    Returns:
-        이미지 디렉토리 절대 경로
-    """
-    dir_path = os.path.join(UPLOAD_DIR, "exam", str(exam_key))
-    os.makedirs(dir_path, exist_ok=True)
-    return dir_path
+def _r2_image_key(exam_key: int, filename: str) -> str:
+    """R2 오브젝트 키를 생성한다. (exam/{exam_key}/{filename})"""
+    return f"exam/{exam_key}/{filename}"
 
 
 def _pdf_page_to_cv2(doc, page_num: int, dpi: int = 300):
@@ -204,18 +193,17 @@ def crop_images_from_pdf(exam_key: int, pdf_key: int) -> list[dict]:
         검출된 이미지 정보 리스트
         [{ "page": 1, "box_index": 1, "filename": "...", "x": ..., "y": ..., "w": ..., "h": ... }, ...]
     """
-    # PDF 파일 경로 조회
+    # PDF 파일을 R2에서 다운로드
     file_info = _get_pdf_file_info(exam_key, pdf_key)
-    file_path = os.path.join(UPLOAD_DIR, file_info["file_path"])
+    r2_key = file_info["file_path"]
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"PDF 파일이 존재하지 않습니다: {file_path}")
+    try:
+        pdf_bytes = r2_storage.download_bytes(r2_key)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"PDF 파일이 R2에 존재하지 않습니다: {r2_key}")
 
-    # 이미지 저장 디렉토리 생성
-    image_dir = _ensure_image_dir(exam_key)
-
-    # PDF 열기
-    doc = fitz.open(file_path)
+    # 메모리에서 PDF 열기
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     results = []
 
     try:
@@ -229,7 +217,7 @@ def crop_images_from_pdf(exam_key: int, pdf_key: int) -> list[dict]:
             if not boxes:
                 continue
 
-            # 각 박스를 이미지/텍스트 판별 후 이미지만 crop하여 저장
+            # 각 박스를 이미지/텍스트 판별 후 이미지만 crop하여 R2에 업로드
             img_box_idx = 0
             for (x, y, bw, bh, area) in boxes:
                 # 텍스트 영역이면 스킵
@@ -238,10 +226,14 @@ def crop_images_from_pdf(exam_key: int, pdf_key: int) -> list[dict]:
 
                 img_box_idx += 1
                 filename = f"p{page_num + 1}_box{img_box_idx}.png"
-                filepath = os.path.join(image_dir, filename)
 
                 cropped = img_cv[y:y + bh, x:x + bw]
-                cv2.imwrite(filepath, cropped)
+
+                # OpenCV 이미지 → PNG 바이트로 인코딩 후 R2 업로드
+                success, png_data = cv2.imencode(".png", cropped)
+                if success:
+                    r2_key_img = _r2_image_key(exam_key, filename)
+                    r2_storage.upload_bytes(r2_key_img, png_data.tobytes(), "image/png")
 
                 results.append({
                     "page": page_num + 1,
@@ -261,7 +253,7 @@ def crop_images_from_pdf(exam_key: int, pdf_key: int) -> list[dict]:
 
 def rename_crop_image(exam_key: int, old_filename: str, new_filename: str) -> str:
     """
-    crop된 임시 이미지 파일명을 최종 파일명으로 변경한다.
+    R2에서 crop된 임시 이미지 파일명을 최종 파일명으로 변경한다. (copy + delete 방식)
 
     Args:
         exam_key: 시험 PK
@@ -269,18 +261,12 @@ def rename_crop_image(exam_key: int, old_filename: str, new_filename: str) -> st
         new_filename: 최종 파일명 (예: 5_1.png)
 
     Returns:
-        변경된 파일의 상대 경로
+        변경된 파일의 R2 키
     """
-    image_dir = os.path.join(UPLOAD_DIR, "exam", str(exam_key))
-    old_path = os.path.join(image_dir, old_filename)
-    new_path = os.path.join(image_dir, new_filename)
-
-    if os.path.exists(old_path):
-        if os.path.exists(new_path):
-            os.remove(new_path)
-        os.rename(old_path, new_path)
-
-    return f"exam/{exam_key}/{new_filename}"
+    old_key = _r2_image_key(exam_key, old_filename)
+    new_key = _r2_image_key(exam_key, new_filename)
+    r2_storage.rename_object(old_key, new_key)
+    return new_key
 
 
 def batch_rename_crop_images(exam_key: int, rename_map: list[dict]) -> list[dict]:
@@ -302,4 +288,120 @@ def batch_rename_crop_images(exam_key: int, rename_map: list[dict]) -> list[dict
             "new_filename": item["new_filename"],
             "path": path,
         })
+    return results
+
+
+# ─── 수동 생성 관련 함수 ────────────────────────────────────────────
+
+
+def get_pdf_page_count(exam_key: int, pdf_key: int) -> int:
+    """
+    PDF 파일의 총 페이지 수를 반환한다.
+
+    Args:
+        exam_key: 시험 PK
+        pdf_key: PDF 파일 PK
+
+    Returns:
+        페이지 수
+    """
+    file_info = _get_pdf_file_info(exam_key, pdf_key)
+    r2_key = file_info["file_path"]
+    pdf_bytes = r2_storage.download_bytes(r2_key)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    count = len(doc)
+    doc.close()
+    return count
+
+
+def render_pdf_page_as_png(exam_key: int, pdf_key: int, page: int, dpi: int = 150) -> bytes:
+    """
+    PDF 특정 페이지를 PNG 이미지 바이트로 변환하여 반환한다.
+    수동 생성 팝업에서 PDF를 이미지로 표시하기 위해 사용한다.
+
+    Args:
+        exam_key: 시험 PK
+        pdf_key: PDF 파일 PK
+        page: 페이지 번호 (1-based)
+        dpi: 렌더링 해상도 (기본 150 — 화면 표시용)
+
+    Returns:
+        PNG 이미지 바이트
+    """
+    file_info = _get_pdf_file_info(exam_key, pdf_key)
+    r2_key = file_info["file_path"]
+    pdf_bytes = r2_storage.download_bytes(r2_key)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    try:
+        page_num = page - 1  # 1-based → 0-based
+        if page_num < 0 or page_num >= len(doc):
+            raise ValueError(f"유효하지 않은 페이지 번호입니다: {page} (총 {len(doc)}페이지)")
+
+        img_cv = _pdf_page_to_cv2(doc, page_num, dpi=dpi)
+        success, png_data = cv2.imencode(".png", img_cv)
+        if not success:
+            raise RuntimeError("PNG 인코딩에 실패했습니다.")
+        return png_data.tobytes()
+    finally:
+        doc.close()
+
+
+def manual_crop_images(exam_key: int, pdf_key: int, crops: list[dict]) -> list[dict]:
+    """
+    사용자가 지정한 좌표로 PDF에서 이미지를 crop하여 R2에 업로드한다.
+    좌표는 300dpi 기준이다.
+
+    Args:
+        exam_key: 시험 PK
+        pdf_key: PDF 파일 PK
+        crops: [{ "page": 1, "x": 100, "y": 200, "w": 300, "h": 400, "filename": "qst_5_1.png" }]
+               page는 1-based, x/y/w/h는 300dpi 기준 픽셀
+
+    Returns:
+        생성된 이미지 정보 리스트 [{ "filename": "...", "r2_key": "..." }]
+    """
+    file_info = _get_pdf_file_info(exam_key, pdf_key)
+    r2_key = file_info["file_path"]
+    pdf_bytes = r2_storage.download_bytes(r2_key)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    results = []
+    try:
+        # 페이지별로 그룹핑하여 같은 페이지는 한 번만 렌더링
+        page_cache = {}
+        for crop in crops:
+            page_num = crop["page"] - 1  # 1-based → 0-based
+            if page_num not in page_cache:
+                page_cache[page_num] = _pdf_page_to_cv2(doc, page_num, dpi=300)
+
+            img_cv = page_cache[page_num]
+            x, y, w, h = crop["x"], crop["y"], crop["w"], crop["h"]
+
+            # 이미지 경계 검증
+            img_h, img_w = img_cv.shape[:2]
+            x = max(0, min(x, img_w))
+            y = max(0, min(y, img_h))
+            w = min(w, img_w - x)
+            h = min(h, img_h - y)
+
+            if w <= 0 or h <= 0:
+                continue
+
+            cropped = img_cv[y:y + h, x:x + w]
+            success, png_data = cv2.imencode(".png", cropped)
+            if not success:
+                continue
+
+            filename = crop["filename"]
+            r2_img_key = _r2_image_key(exam_key, filename)
+            r2_storage.upload_bytes(r2_img_key, png_data.tobytes(), "image/png")
+
+            results.append({
+                "filename": filename,
+                "r2_key": r2_img_key,
+            })
+    finally:
+        doc.close()
+
     return results

@@ -41,6 +41,9 @@ export const useExamListStore = defineStore('examList', () => {
   /** 토픽레벨 코드 옵션 (셀렉트박스용) */
   const tpkLevelOptions = ref([]);
 
+  /** 시험종류(topik_type) 코드 옵션 (셀렉트박스용) — IBT/PBT 등 */
+  const topikTypeOptions = ref([]);
+
   /** 영역 코드 옵션 (셀렉트박스용) */
   const sectionOptions = ref([]);
 
@@ -84,12 +87,14 @@ export const useExamListStore = defineStore('examList', () => {
    */
   async function fetchCodeOptions() {
     try {
-      const [examTypeRes, tpkCategoryRes, sectionRes] = await Promise.all([
+      const [examTypeRes, topikTypeRes, tpkCategoryRes, sectionRes] = await Promise.all([
         codeApi.getList({ group_code: 'exam_type', size: 100 }),
+        codeApi.getList({ group_code: 'topik_type', size: 100 }),
         codeApi.getList({ group_code: 'tpk_level', size: 100 }),
         codeApi.getList({ group_code: 'section', size: 100 })
       ]);
       examTypeOptions.value = examTypeRes.list || examTypeRes.data || [];
+      topikTypeOptions.value = topikTypeRes.list || topikTypeRes.data || [];
       tpkLevelOptions.value = tpkCategoryRes.list || tpkCategoryRes.data || [];
       sectionOptions.value = sectionRes.list || sectionRes.data || [];
     } catch (error) {
@@ -148,6 +153,7 @@ export const useExamListStore = defineStore('examList', () => {
     loading,
     searchParams,
     examTypeOptions,
+    topikTypeOptions,
     tpkLevelOptions,
     sectionOptions,
     fetchList,

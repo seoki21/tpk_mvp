@@ -44,7 +44,7 @@ async function handleSubmit() {
       <h1 class="mb-6 text-center text-2xl font-bold text-gray-800">TOPIK 관리자</h1>
 
       <!-- 로그인 폼 -->
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
         <!-- 아이디 -->
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">아이디</label>
@@ -74,11 +74,7 @@ async function handleSubmit() {
         <p v-if="errorMsg" class="text-sm text-red-500">{{ errorMsg }}</p>
 
         <!-- 로그인 버튼 -->
-        <button
-          type="submit"
-          class="btn btn-primary w-full py-2"
-          :disabled="loading"
-        >
+        <button type="submit" class="btn btn-primary w-full py-2" :disabled="loading">
           {{ loading ? '로그인 중...' : '로그인' }}
         </button>
       </form>

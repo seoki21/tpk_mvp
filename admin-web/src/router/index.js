@@ -39,6 +39,12 @@ const router = createRouter({
           name: 'examQuestions',
           component: () => import('../views/ExamListView.vue')
         },
+        /* 시험일정관리 */
+        {
+          path: 'exam-schedules',
+          name: 'examSchedules',
+          component: () => import('../views/ExamScheduleView.vue')
+        },
         /* 기출문제관리 */
         {
           path: 'past-exam-questions',
@@ -65,7 +71,19 @@ const router = createRouter({
         {
           path: 'question-types',
           name: 'questionTypes',
-          component: () => import('../views/PlaceholderView.vue')
+          component: () => import('../views/QuestionTypeView.vue')
+        },
+        /* 등급 관리 */
+        {
+          path: 'grade-scores',
+          name: 'gradeScores',
+          component: () => import('../views/GradeScoreView.vue')
+        },
+        /* TTS 생성 테스트 */
+        {
+          path: 'tts-test',
+          name: 'ttsTest',
+          component: () => import('../views/TtsTestView.vue')
         },
         /* 관리자 관리 */
         {

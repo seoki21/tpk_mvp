@@ -5,7 +5,11 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# config.py 위치(backend/app/)에서 두 단계 상위인 backend/ 폴더의 .env를 명시적으로 로드
+# load_dotenv() 기본값은 CWD 기준이므로, uvicorn 실행 위치에 따라 .env를 못 찾는 문제 방지
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# override=True: 시스템 환경변수에 빈 값이 등록되어 있어도 .env 값으로 덮어씀
+load_dotenv(os.path.join(_BASE_DIR, ".env"), override=True)
 
 # 데이터베이스 접속 정보 — 개별 환경변수로부터 접속 문자열 조합
 DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -36,6 +40,15 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 # AI (Google Gemini) 설정
 GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY", "")
 GOOGLE_AI_MODEL = os.getenv("GOOGLE_AI_MODEL", "gemini-2.5-flash")
+
+# GPT-SoVITS TTS 서버 설정
+GPT_SOVITS_API_URL = os.getenv("GPT_SOVITS_API_URL", "http://211.55.172.19:9880")
+
+# Cloudflare R2 Object Storage 설정
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", "")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
 
 # AI 모델별 토큰 단가 (USD per 1M tokens) — 비용 추적용
 AI_TOKEN_PRICING = {

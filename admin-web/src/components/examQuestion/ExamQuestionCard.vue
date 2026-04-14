@@ -31,8 +31,25 @@ const props = defineProps({
   feedbackData: {
     type: Object,
     default: () => ({ tabs: [], source: 'none' })
+  },
+  /** 영역(section) 코드 목록 — [{ code, code_name }] */
+  sectionCodes: {
+    type: Array,
+    default: () => []
+  },
+  /** 지문유형(passage_type) 코드 목록 */
+  passageTypeCodes: {
+    type: Array,
+    default: () => []
+  },
+  /** 문제유형(question_type) 코드 목록 */
+  questionTypeCodes: {
+    type: Array,
+    default: () => []
   }
 });
+
+const emit = defineEmits(['code-change']);
 
 /* ========== 피드백 탭 상태 관리 ========== */
 const feedbackActiveTab = reactive({});
@@ -110,28 +127,41 @@ function parseFeedback(fb) {
 </script>
 
 <template>
-  <!-- 상단: {no}번 {section} {type} {score}점 + 이미지 생성 버튼 -->
+  <!-- 상단: {no}번 + 코드 셀렉트박스 (section, passage_type, question_type) + 배점 -->
   <div class="mb-3 border-b border-gray-200 pb-2">
-    <div class="flex items-center gap-2 text-sm">
-      <span class="font-bold text-gray-800">
-        {{ item.question_no }}번
-      </span>
-      <span
-        v-if="parsed && parsed.section"
-        class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700"
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <span class="font-bold text-gray-800"> {{ item.question_no }}번 </span>
+      <!-- 영역(section) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.section"
+        class="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 focus:border-blue-400 focus:outline-none"
+        @change="emit('code-change', item, 'section', $event.target.value)"
       >
-        {{ parsed.section }}
-      </span>
-      <span
-        v-if="parsed && parsed.type"
-        class="rounded bg-green-50 px-1.5 py-0.5 text-green-700"
+        <option value="">영역</option>
+        <option v-for="c in sectionCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <!-- 지문유형(passage_type) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.passage_type"
+        class="rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700 focus:border-purple-400 focus:outline-none"
+        @change="emit('code-change', item, 'passage_type', $event.target.value)"
       >
-        {{ parsed.type }}
-      </span>
-      <span
-        v-if="parsed && parsed.score"
-        class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700"
+        <option value="">지문유형</option>
+        <option v-for="c in passageTypeCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <!-- 문제유형(question_type) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.question_type"
+        class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-700 focus:border-green-400 focus:outline-none"
+        @change="emit('code-change', item, 'question_type', $event.target.value)"
       >
+        <option value="">문제유형</option>
+        <option v-for="c in questionTypeCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <span v-if="parsed && parsed.score" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">
         {{ parsed.score }}점
       </span>
     </div>
@@ -149,7 +179,9 @@ function parseFeedback(fb) {
     <p
       v-if="parsed.question_text"
       class="mb-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
-    >{{ item.question_no }}. {{ parsed.question_text }}</p>
+    >
+      {{ item.question_no }}. {{ parsed.question_text }}
+    </p>
     <!-- 선택지: 이미지 선택지 (2열 그리드, 번호 옆에 이미지 가로 배치) -->
     <div
       v-if="parsed.choices && parsed.choices.length && isChoiceImage(parsed.choices[0])"
@@ -161,7 +193,9 @@ function parseFeedback(fb) {
         class="flex items-center gap-2 rounded border p-1"
         :class="ci + 1 === Number(correctAnswer) ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
       >
-        <span class="shrink-0 text-sm font-medium text-gray-500">{{ String.fromCodePoint(0x2460 + ci) }}</span>
+        <span class="shrink-0 text-sm font-medium text-gray-500">{{
+          String.fromCodePoint(0x2460 + ci)
+        }}</span>
         <img
           :src="getImageUrl(getChoiceImageFilename(choice))"
           :alt="`선택지 ${ci + 1}`"
@@ -169,10 +203,7 @@ function parseFeedback(fb) {
         />
       </div>
     </div>
-    <div
-      v-else-if="parsed.choices"
-      class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
-    >
+    <div v-else-if="parsed.choices" class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
       <span
         v-for="(choice, ci) in parsed.choices"
         :key="ci"
@@ -208,19 +239,13 @@ function parseFeedback(fb) {
           v-for="(fb, fi) in getActiveFeedbackList()"
           :key="fi"
           class="flex items-start gap-1.5 text-sm leading-relaxed"
-          :class="
-            parseFeedback(fb).isCorrect
-              ? 'font-medium text-blue-700'
-              : 'text-gray-600'
-          "
+          :class="parseFeedback(fb).isCorrect ? 'font-medium text-blue-700' : 'text-gray-600'"
         >
           <span class="shrink-0">{{ parseFeedback(fb).label }}</span>
           <span>{{ parseFeedback(fb).text }}</span>
         </div>
       </div>
-      <p v-else class="py-2 text-sm text-gray-400">
-        피드백 데이터가 없습니다.
-      </p>
+      <p v-else class="py-2 text-sm text-gray-400">피드백 데이터가 없습니다.</p>
     </div>
   </template>
   <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>

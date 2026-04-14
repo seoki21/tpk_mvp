@@ -86,7 +86,9 @@ function handleSelect(file) {
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
           @click="handleSelect(file)"
         >
-          <span v-if="fileTypeLabel" class="shrink-0 text-xs font-semibold text-red-500">{{ fileTypeLabel }}</span>
+          <span v-if="fileTypeLabel" class="shrink-0 text-xs font-semibold text-red-500">{{
+            fileTypeLabel
+          }}</span>
           <span class="truncate">{{ file.file_name }}</span>
         </button>
       </div>

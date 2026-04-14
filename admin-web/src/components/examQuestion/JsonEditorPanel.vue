@@ -40,12 +40,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits([
-  'update:jsonText',
-  'update:activeTab',
-  'generate-feedback',
-  'save-item'
-]);
+const emit = defineEmits(['update:jsonText', 'update:activeTab', 'generate-feedback', 'save-item']);
 
 /** pre 요소 참조 (스크롤 동기화용) */
 const preRef = ref(null);
@@ -62,10 +57,7 @@ const showSaveHint = ref(false);
  */
 function highlightJson(text) {
   if (!text) return '{}';
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return (
     escaped
       .replace(/"([^"]+)"(?=\s*:)/g, '<span class="text-purple-600">"$1"</span>')
@@ -141,11 +133,7 @@ function syncScroll(event) {
       >
         {{ feedbackGenerating ? '생성 중...' : '피드백 생성(API)' }}
       </button>
-      <button
-        class="btn btn-xs btn-secondary"
-        :disabled="itemSaving"
-        @click="handleSaveClick"
-      >
+      <button class="btn btn-xs btn-secondary" :disabled="itemSaving" @click="handleSaveClick">
         {{ itemSaving ? '저장 중...' : '저장' }}
       </button>
     </div>
@@ -171,9 +159,7 @@ function syncScroll(event) {
       ></textarea>
     </div>
     <!-- JSON 에러 / 저장 안내 문구 (동시 표시 안 함) -->
-    <span v-if="hasError" class="mt-1 block text-xs text-red-500">
-      JSON 형식 오류
-    </span>
+    <span v-if="hasError" class="mt-1 block text-xs text-red-500"> JSON 형식 오류 </span>
     <span v-else-if="showSaveHint" class="mt-1 block text-xs text-amber-500">
       수정사항을 반영하려면 저장이 필요합니다
     </span>

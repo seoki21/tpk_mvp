@@ -41,7 +41,8 @@ const showMenu = ref(false);
 /** 테마별 버튼 스타일 (soft blue 톤 통일) */
 const themeStyles = {
   blue: 'border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400',
-  purple: 'border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400'
+  purple:
+    'border-blue-300 bg-blue-50 text-blue-600 hover:border-blue-400 hover:bg-blue-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400'
 };
 
 /** 테마별 드롭다운 호버 스타일 */
@@ -73,7 +74,13 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick));
       @click.stop="showMenu = !showMenu"
     >
       {{ loading ? loadingLabel : label }}
-      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <svg
+        class="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+      >
         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
       </svg>
     </button>

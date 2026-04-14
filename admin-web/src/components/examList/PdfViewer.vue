@@ -23,7 +23,9 @@ defineProps({
 <template>
   <div class="flex flex-col overflow-hidden rounded border border-gray-300">
     <!-- 헤더: DataTable 상단 바와 동일한 스타일 -->
-    <div class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2">
+    <div
+      class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2"
+    >
       <span class="text-sm font-medium text-gray-700">파일 보기</span>
       <span v-if="fileName" class="truncate text-sm text-gray-500">{{ fileName }}</span>
     </div>
@@ -32,7 +34,10 @@ defineProps({
     <div v-if="url" class="min-h-[400px] flex-1">
       <iframe :src="url" class="h-full w-full border-0"></iframe>
     </div>
-    <div v-else class="flex min-h-[400px] flex-1 items-center justify-center bg-gray-50 text-gray-400">
+    <div
+      v-else
+      class="flex min-h-[400px] flex-1 items-center justify-center bg-gray-50 text-gray-400"
+    >
       파일을 선택하세요
     </div>
   </div>

@@ -1,17 +1,18 @@
 """
 시험 파일 API 라우터
 tb_exam_file 테이블에 대한 업로드/조회/삭제/다운로드 엔드포인트를 정의한다.
+파일 서빙은 R2에서 프록시 방식으로 스트리밍한다.
 URL 접두사: /api/v1/exam-list/{exam_key}/files
 """
-import os
+from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse, Response
 from typing import List, Optional
 
 from app.models.common import BaseResponse
 from app.services import exam_file as exam_file_service
 from app.services import exam_list as exam_list_service
-from app.config import UPLOAD_DIR
+from app.services import r2_storage
 from app.utils.auth import get_current_admin
 
 router = APIRouter(
@@ -90,29 +91,27 @@ async def upload_files(
 @router.get("/images/{filename}")
 def get_image(exam_key: int, filename: str):
     """
-    crop된 이미지 파일을 서빙한다.
-    경로: uploads/exam/{exam_key}/{filename}
+    crop된 이미지 파일을 R2에서 프록시 서빙한다.
+    R2 키: exam/{exam_key}/{filename}
     주의: /{pdf_key} 패턴보다 먼저 정의하여 라우트 충돌을 방지한다.
     """
     try:
-        full_path = os.path.join(UPLOAD_DIR, "exam", str(exam_key), filename)
-        if not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail="이미지 파일을 찾을 수 없습니다.")
-
-        return FileResponse(
-            path=full_path,
+        r2_key = f"exam/{exam_key}/{filename}"
+        data = r2_storage.download_bytes(r2_key)
+        return Response(
+            content=data,
             media_type="image/png",
-            content_disposition_type="inline",
+            headers={"Content-Disposition": "inline"},
         )
-    except HTTPException:
-        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="이미지 파일을 찾을 수 없습니다.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"이미지 조회 실패: {str(e)}")
 
 
 @router.delete("/{pdf_key}", response_model=BaseResponse, dependencies=[Depends(get_current_admin)])
 def delete_file(exam_key: int, pdf_key: int):
-    """파일을 삭제한다. (소프트 삭제 + 파일 삭제)"""
+    """파일을 삭제한다. (소프트 삭제 + R2 파일 삭제)"""
     try:
         _check_exam_exists(exam_key)
 
@@ -130,7 +129,7 @@ def delete_file(exam_key: int, pdf_key: int):
 @router.get("/{pdf_key}/download")
 def download_file(exam_key: int, pdf_key: int, inline: bool = False):
     """
-    파일을 다운로드한다.
+    파일을 R2에서 다운로드하여 프록시 서빙한다.
     - inline=True: 브라우저에서 인라인으로 표시 (PDF 뷰어용)
     - inline=False(기본): 다운로드 첨부 파일로 응답
     """
@@ -141,10 +140,9 @@ def download_file(exam_key: int, pdf_key: int, inline: bool = False):
         if not file_info:
             raise HTTPException(status_code=404, detail="해당 파일을 찾을 수 없습니다.")
 
-        # 파일 경로 구성
-        full_path = os.path.join(UPLOAD_DIR, file_info["file_path"])
-        if not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+        # R2에서 스트리밍으로 다운로드
+        r2_key = file_info["file_path"]
+        body_iter, content_length, _ = r2_storage.download_stream(r2_key)
 
         # 파일 유형에 따른 media_type 결정
         file_type_val = file_info.get("file_type")
@@ -155,13 +153,22 @@ def download_file(exam_key: int, pdf_key: int, inline: bool = False):
         else:
             media = "application/pdf"
 
-        # 원본 파일명으로 응답 (inline 여부에 따라 Content-Disposition 결정)
-        return FileResponse(
-            path=full_path,
-            filename=file_info["file_name"],
+        # Content-Disposition 결정 (inline / attachment)
+        # 한글 파일명 지원: RFC 5987 방식으로 UTF-8 인코딩
+        disposition = "inline" if inline else "attachment"
+        filename = file_info["file_name"]
+        encoded_filename = quote(filename)
+
+        return StreamingResponse(
+            body_iter,
             media_type=media,
-            content_disposition_type="inline" if inline else "attachment",
+            headers={
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{encoded_filename}",
+                "Content-Length": str(content_length),
+            },
         )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
     except HTTPException:
         raise
     except Exception as e:

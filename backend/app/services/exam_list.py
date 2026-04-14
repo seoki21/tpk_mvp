@@ -10,11 +10,12 @@ from app.utils.pagination import get_limit_offset
 
 # 시험문항 목록/상세 조회에서 사용하는 공통 SELECT 절 (코드명 LEFT JOIN 포함)
 _BASE_SELECT = """
-    SELECT e.exam_key, e.exam_year, e.exam_type, e.round, e.tpk_level, e.section,
+    SELECT e.exam_key, e.exam_year, e.exam_type, e.tpk_type, e.round, e.tpk_level, e.section,
            e.del_yn,
            TO_CHAR(e.ins_date, 'YYYY-MM-DD HH24:MI:SS') AS ins_date, e.ins_user,
            TO_CHAR(e.upd_date, 'YYYY-MM-DD HH24:MI:SS') AS upd_date, e.upd_user,
            et.code_name AS exam_type_name,
+           tt.code_name AS tpk_type_name,
            tl.code_name AS tpk_level_name,
            sc.code_name AS section_name,
            (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE '' END
@@ -25,6 +26,7 @@ _BASE_SELECT = """
               FROM tb_exam_file ef WHERE ef.exam_key = e.exam_key AND ef.del_yn = 'N' AND ef.file_type = 'mp3') AS mp3_count
       FROM tb_exam_list e
       LEFT JOIN tb_code et ON et.group_code = 'exam_type' AND et.code = CAST(NULLIF(e.exam_type, '') AS INTEGER)
+      LEFT JOIN tb_code tt ON tt.group_code = 'topik_type' AND tt.code = e.tpk_type
       LEFT JOIN tb_code tl ON tl.group_code = 'tpk_level' AND tl.code = CAST(NULLIF(e.tpk_level, '') AS INTEGER)
       LEFT JOIN tb_code sc ON sc.group_code = 'section' AND sc.code = CAST(NULLIF(e.section, '') AS INTEGER)
 """
@@ -139,14 +141,15 @@ def create_exam(data: dict, user: str = "admin") -> dict:
         # RETURNING으로 생성된 PK를 안전하게 조회 (lastval() 대비 동시성 안전)
         cursor.execute(
             """
-            INSERT INTO tb_exam_list (exam_year, exam_type, round, tpk_level, section,
+            INSERT INTO tb_exam_list (exam_year, exam_type, tpk_type, round, tpk_level, section,
                                       del_yn, ins_date, ins_user, upd_date, upd_user)
-            VALUES (%s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
+            VALUES (%s, %s, %s, %s, %s, %s, 'N', NOW(), %s, NOW(), %s)
             RETURNING exam_key
             """,
             (
                 data["exam_year"],
                 data["exam_type"],
+                data.get("tpk_type"),
                 data.get("round"),
                 data.get("tpk_level"),
                 data["section"],
@@ -186,7 +189,7 @@ def update_exam(exam_key: int, data: dict, user: str = "admin") -> Optional[dict
         # None이 아닌 필드만 SET 절에 추가 (동적 UPDATE 구성)
         set_clauses = []
         params = []
-        for field in ["exam_year", "exam_type", "round", "tpk_level", "section", "del_yn"]:
+        for field in ["exam_year", "exam_type", "tpk_type", "round", "tpk_level", "section", "del_yn"]:
             if data.get(field) is not None:
                 set_clauses.append(f"{field} = %s")
                 params.append(data[field])

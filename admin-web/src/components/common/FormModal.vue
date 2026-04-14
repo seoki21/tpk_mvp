@@ -46,7 +46,8 @@ function onModalClick(e) {
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-y-0 right-0 z-50 flex items-center justify-center overflow-auto bg-black/50"
+      style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))"
       @click="onOverlayClick"
     >
       <!-- 모달 박스 -->
@@ -69,14 +70,8 @@ function onModalClick(e) {
 
         <!-- 하단 버튼 바 -->
         <div class="flex items-center justify-center gap-3 border-t border-gray-200 px-6 py-4">
-          <button class="btn btn-sm btn-primary px-6" @click="emit('save')">
-            저장
-          </button>
-          <button
-            v-if="showDelete"
-            class="btn btn-sm btn-danger px-6"
-            @click="emit('delete')"
-          >
+          <button class="btn btn-sm btn-primary px-6" @click="emit('save')">저장</button>
+          <button v-if="showDelete" class="btn btn-sm btn-danger px-6" @click="emit('delete')">
             삭제
           </button>
         </div>

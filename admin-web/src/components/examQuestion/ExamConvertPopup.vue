@@ -8,11 +8,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import { useExamQuestionStore } from '@/stores/examQuestion';
-import {
-  convertPdfToJsonStream,
-  bulkSave,
-  getQuestionsAndInstructions
-} from '@/api/examQuestion';
+import { convertPdfToJsonStream, bulkSave, getQuestionsAndInstructions } from '@/api/examQuestion';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import AiProviderDropdown from '@/components/examQuestion/AiProviderDropdown.vue';
 import { useToast } from '@/composables/useToast';
@@ -164,13 +160,17 @@ async function loadSavedJson(ek) {
         const parsed = JSON.parse(ins.ins_json);
         const firstNo = parsed.no_list && parsed.no_list.length ? parsed.no_list[0] : ins.ins_no;
         items.push({ _sortKey: firstNo, _isInstruction: true, data: parsed });
-      } catch { /* 파싱 실패 건너뜀 */ }
+      } catch {
+        /* 파싱 실패 건너뜀 */
+      }
     });
     savedQuestions.forEach((q) => {
       try {
         const parsed = JSON.parse(q.question_json);
         items.push({ _sortKey: q.question_no, _isInstruction: false, data: parsed });
-      } catch { /* 파싱 실패 건너뜀 */ }
+      } catch {
+        /* 파싱 실패 건너뜀 */
+      }
     });
     items.sort((a, b) => {
       if (a._sortKey !== b._sortKey) return a._sortKey - b._sortKey;
@@ -178,20 +178,30 @@ async function loadSavedJson(ek) {
       if (!a._isInstruction && b._isInstruction) return 1;
       return 0;
     });
-    jsonText.value = JSON.stringify(items.map((item) => item.data), null, 2);
+    jsonText.value = JSON.stringify(
+      items.map((item) => item.data),
+      null,
+      2
+    );
 
     /* 피드백 탭: 문제별 feedback_json을 { question_no: feedback } 형태로 복원 */
     const feedbackMap = {};
     savedQuestions.forEach((q) => {
       if (q.feedback_json) {
-        try { feedbackMap[q.question_no] = JSON.parse(q.feedback_json); } catch { /* */ }
+        try {
+          feedbackMap[q.question_no] = JSON.parse(q.feedback_json);
+        } catch {
+          /* */
+        }
       }
     });
     if (Object.keys(feedbackMap).length > 0) {
       feedbackJsonText.value = JSON.stringify(feedbackMap, null, 2);
     }
     streamStatus.value = 'loaded';
-  } catch { /* 조회 실패 시 무시 */ }
+  } catch {
+    /* 조회 실패 시 무시 */
+  }
 }
 
 /* ========== 자동 스크롤 ========== */
@@ -222,28 +232,34 @@ async function confirmConvert() {
   tokenUsage.value = null;
 
   try {
-    await convertPdfToJsonStream(props.examKey, props.pdfKey, (event) => {
-      switch (event.type) {
-        case 'start':
-          streamStatus.value = 'streaming';
-          break;
-        case 'text_delta':
-          jsonText.value += event.data.text;
-          scrollToBottom();
-          break;
-        case 'done':
-          streamStatus.value = 'done';
-          tokenUsage.value = event.data.token_usage;
-          if (event.data.stop_reason === 'max_tokens') {
-            toast.warning('AI 응답이 최대 토큰 한도에 도달하여 JSON이 잘렸을 수 있습니다.');
-          }
-          break;
-        case 'error':
-          streamStatus.value = 'error';
-          toast.error(event.data.detail || 'PDF 변환에 실패했습니다.');
-          break;
-      }
-    }, selectedAiProvider.value, examSection.value);
+    await convertPdfToJsonStream(
+      props.examKey,
+      props.pdfKey,
+      (event) => {
+        switch (event.type) {
+          case 'start':
+            streamStatus.value = 'streaming';
+            break;
+          case 'text_delta':
+            jsonText.value += event.data.text;
+            scrollToBottom();
+            break;
+          case 'done':
+            streamStatus.value = 'done';
+            tokenUsage.value = event.data.token_usage;
+            if (event.data.stop_reason === 'max_tokens') {
+              toast.warning('AI 응답이 최대 토큰 한도에 도달하여 JSON이 잘렸을 수 있습니다.');
+            }
+            break;
+          case 'error':
+            streamStatus.value = 'error';
+            toast.error(event.data.detail || 'PDF 변환에 실패했습니다.');
+            break;
+        }
+      },
+      selectedAiProvider.value,
+      examSection.value
+    );
   } catch {
     streamStatus.value = 'error';
     toast.error('PDF 변환 중 네트워크 오류가 발생했습니다.');
@@ -321,8 +337,8 @@ async function confirmSave() {
       } else if (item.item_type === 'Q') {
         questions.push({
           question_no: item.no,
-          section: item.section || null,
-          question_type: item.type || null,
+          section: item.section != null ? String(item.section) : null,
+          question_type: item.question_type != null ? String(item.question_type) : null,
           struct_type: null,
           question_json: JSON.stringify(item),
           score: item.score || null,
@@ -341,7 +357,7 @@ async function confirmSave() {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div v-if="visible" class="fixed inset-y-0 right-0 z-50 flex items-center justify-center overflow-auto bg-black/50" style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))"
       <div class="mx-4 flex h-[85vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
         <!-- 헤더 -->
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
@@ -353,7 +369,13 @@ async function confirmSave() {
             class="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             @click="emit('close')"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -370,8 +392,19 @@ async function confirmSave() {
               fill="none"
               viewBox="0 0 24 24"
             >
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
             <span>{{ statusMessage }}</span>
           </div>
@@ -424,14 +457,22 @@ async function confirmSave() {
           <div class="flex items-center border-b border-gray-700 bg-gray-800 px-4">
             <button
               class="px-4 py-2 text-sm transition-colors"
-              :class="activeTab === 'question' ? 'border-b-2 border-blue-400 font-medium text-blue-400' : 'text-gray-400 hover:text-gray-200'"
+              :class="
+                activeTab === 'question'
+                  ? 'border-b-2 border-blue-400 font-medium text-blue-400'
+                  : 'text-gray-400 hover:text-gray-200'
+              "
               @click="activeTab = 'question'"
             >
               문제
             </button>
             <button
               class="px-4 py-2 text-sm transition-colors"
-              :class="activeTab === 'feedback' ? 'border-b-2 border-blue-400 font-medium text-blue-400' : 'text-gray-400 hover:text-gray-200'"
+              :class="
+                activeTab === 'feedback'
+                  ? 'border-b-2 border-blue-400 font-medium text-blue-400'
+                  : 'text-gray-400 hover:text-gray-200'
+              "
               @click="activeTab = 'feedback'"
             >
               피드백
@@ -440,32 +481,67 @@ async function confirmSave() {
               v-show="activeTab === 'question'"
               class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-gray-400"
             >
-              <input v-model="questionEditable" type="checkbox" class="h-3.5 w-3.5 rounded border-gray-500 bg-gray-700 text-blue-500" />
+              <input
+                v-model="questionEditable"
+                type="checkbox"
+                class="h-3.5 w-3.5 rounded border-gray-500 bg-gray-700 text-blue-500"
+              />
               편집 가능
             </label>
             <label
               v-show="activeTab === 'feedback'"
               class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-gray-400"
             >
-              <input v-model="feedbackEditable" type="checkbox" class="h-3.5 w-3.5 rounded border-gray-500 bg-gray-700 text-blue-500" />
+              <input
+                v-model="feedbackEditable"
+                type="checkbox"
+                class="h-3.5 w-3.5 rounded border-gray-500 bg-gray-700 text-blue-500"
+              />
               편집 가능
             </label>
           </div>
 
           <!-- 문제 탭 내용 -->
-          <div v-show="activeTab === 'question'" ref="jsonContainer" class="flex-1 overflow-auto bg-gray-900 p-4">
+          <div
+            v-show="activeTab === 'question'"
+            ref="jsonContainer"
+            class="flex-1 overflow-auto bg-gray-900 p-4"
+          >
             <textarea
               v-if="jsonText && questionEditable"
               v-model="jsonText"
               class="h-full w-full resize-none border-0 bg-gray-900 font-mono text-sm leading-relaxed text-green-400 outline-none focus:ring-0"
               spellcheck="false"
             ></textarea>
-            <pre v-else-if="jsonText" class="whitespace-pre-wrap text-sm leading-relaxed text-green-400">{{ jsonText }}</pre>
-            <div v-else-if="streamStatus === 'connecting'" class="flex h-full items-center justify-center text-gray-400">
+            <pre
+              v-else-if="jsonText"
+              class="whitespace-pre-wrap text-sm leading-relaxed text-green-400"
+              >{{ jsonText }}</pre
+            >
+            <div
+              v-else-if="streamStatus === 'connecting'"
+              class="flex h-full items-center justify-center text-gray-400"
+            >
               <div class="text-center">
-                <svg class="mx-auto mb-3 h-8 w-8 animate-spin text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <svg
+                  class="mx-auto mb-3 h-8 w-8 animate-spin text-blue-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 <p>{{ selectedAiProvider === 'gemini' ? 'Gemini' : 'Claude' }} API 연결 중...</p>
               </div>
@@ -483,7 +559,11 @@ async function confirmSave() {
               class="h-full w-full resize-none border-0 bg-gray-900 font-mono text-sm leading-relaxed text-green-400 outline-none focus:ring-0"
               spellcheck="false"
             ></textarea>
-            <pre v-else-if="feedbackJsonText" class="whitespace-pre-wrap text-sm leading-relaxed text-green-400">{{ feedbackJsonText }}</pre>
+            <pre
+              v-else-if="feedbackJsonText"
+              class="whitespace-pre-wrap text-sm leading-relaxed text-green-400"
+              >{{ feedbackJsonText }}</pre
+            >
             <div v-else class="flex h-full items-center justify-center text-gray-500">
               피드백 데이터가 없습니다.
             </div>

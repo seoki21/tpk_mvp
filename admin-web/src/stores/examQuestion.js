@@ -193,7 +193,9 @@ export const useExamQuestionStore = defineStore('examQuestion', () => {
         exam.exam_year ? exam.exam_year + '년' : '',
         exam.round ? '제' + exam.round + '회' : '',
         exam.tpk_level_name || ''
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
       const sectionName = exam.section_name || '';
 
       for (const file of files) {

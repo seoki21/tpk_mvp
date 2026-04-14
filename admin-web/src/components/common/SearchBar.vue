@@ -27,14 +27,8 @@ const emit = defineEmits(['search', 'register']);
 
     <!-- 조회/등록 버튼 영역 -->
     <div class="ml-4 flex shrink-0 items-center gap-2">
-      <button class="btn btn-sm btn-secondary" @click="emit('search')">
-        조회
-      </button>
-      <button
-        v-if="!hideRegister"
-        class="btn btn-sm btn-secondary"
-        @click="emit('register')"
-      >
+      <button class="btn btn-sm btn-secondary" @click="emit('search')">조회</button>
+      <button v-if="!hideRegister" class="btn btn-sm btn-secondary" @click="emit('register')">
         등록
       </button>
     </div>

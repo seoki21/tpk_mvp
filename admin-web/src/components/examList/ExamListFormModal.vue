@@ -50,9 +50,10 @@ const form = ref({
   exam_key: '',
   exam_year: '',
   exam_type: '',
+  tpk_type: '',
   tpk_level: '',
   round: '',
-  section: '',
+  section: ''
 });
 
 /* ========== PDF 파일 관련 상태 ========== */
@@ -94,6 +95,7 @@ watch(
           exam_key: props.editData.exam_key || '',
           exam_year: props.editData.exam_year || '',
           exam_type: props.editData.exam_type || '',
+          tpk_type: props.editData.tpk_type ?? '',
           tpk_level: props.editData.tpk_level || '',
           round: props.editData.round ?? '',
           section: props.editData.section || ''
@@ -106,6 +108,7 @@ watch(
           exam_key: '',
           exam_year: '',
           exam_type: '',
+          tpk_type: '',
           tpk_level: '',
           round: '',
           section: ''
@@ -251,7 +254,6 @@ function getFileDownloadUrl(file) {
   return getDownloadUrl(form.value.exam_key, file.pdf_key);
 }
 
-
 /* ========== 삭제 확인 다이얼로그 ========== */
 const showConfirm = ref(false);
 
@@ -264,6 +266,7 @@ async function handleSave() {
       await store.update(form.value.exam_key, {
         exam_year: form.value.exam_year,
         exam_type: form.value.exam_type,
+        tpk_type: form.value.tpk_type || null,
         tpk_level: form.value.tpk_level,
         round: form.value.round,
         section: form.value.section
@@ -274,6 +277,7 @@ async function handleSave() {
       const result = await store.create({
         exam_year: form.value.exam_year,
         exam_type: form.value.exam_type,
+        tpk_type: form.value.tpk_type || null,
         tpk_level: form.value.tpk_level,
         round: form.value.round,
         section: form.value.section
@@ -389,6 +393,20 @@ function cancelDelete() {
         >
           <option value=""></option>
           <option v-for="opt in store.examTypeOptions" :key="opt.code" :value="String(opt.code)">
+            {{ opt.code_name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- 시험종류 (IBT/PBT) -->
+      <div class="flex items-center">
+        <label class="w-28 shrink-0 text-sm font-medium text-gray-700">시험 종류</label>
+        <select
+          v-model="form.tpk_type"
+          class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value=""></option>
+          <option v-for="opt in store.topikTypeOptions" :key="opt.code" :value="opt.code">
             {{ opt.code_name }}
           </option>
         </select>

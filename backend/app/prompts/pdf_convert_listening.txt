@@ -1,5 +1,79 @@
 역할: 당신은 TOPIK(한국어능력시험) 기출문제 분석 및 데이터 구조화 전문가입니다. 제공된 PDF 내용을 분석하여 아래 규칙에 따라 정밀한 JSON 배열로 변환하십시오.
 
+*코드
+  section	16 - 읽기
+  section	17 - 쓰기
+  section	15 - 듣기
+  passage_type	1	짧은 대화
+  passage_type	2	매체 담화
+  passage_type	3	대화
+  passage_type	4	짧은 서술문
+  passage_type	5	실용문
+  passage_type	6	수필
+  passage_type	7	설명문
+  passage_type	8	짧은 글
+  passage_type	9	뉴스
+  passage_type	10	안내/공지
+  passage_type	11	뉴스/보도
+  passage_type	12	인터뷰
+  passage_type	13	토론
+  passage_type	14	강연
+  passage_type	15	공식적인 인사말
+  passage_type	16	교양 프로그램
+  passage_type	17	대담
+  passage_type	18	다큐멘터리
+  passage_type	19	광고
+  passage_type	20	안내문
+  passage_type	21	도표
+  passage_type	22	기사문
+  passage_type	23	간단한 글
+  passage_type	24	글
+  passage_type	25	신문 기사의 제목
+  passage_type	26	서평/감상문
+  passage_type	27	소설
+  passage_type	28	논설문
+  passage_type	29	도표/그래프 등
+  passage_type	30	사회적 이슈
+  question_type	1	맞는 대답 고르기
+  question_type	2	이어지는 말 고르기
+  question_type	3	담화 장소 고르기
+  question_type	4	화제 고르기
+  question_type	5	일치하는 그림 고르기
+  question_type	6	일치하는 내용 고르기
+  question_type	7	일치하지 않는 내용 고르기
+  question_type	8	중심 내용 고르기
+  question_type	9	중심 생각 고르기
+  question_type	10	빈칸에 알맞은 말 고르기
+  question_type	11	알맞은 순서로 배열한 것 고르기
+  question_type	12	문장이 들어갈 위치 고르기
+  question_type	13	의도/목적/이유 고르기
+  question_type	14	필자의 의도/목적 고르기
+  question_type	15	담화 상황과 추론하여 일치하는 그림 고르기
+  question_type	16	세부 내용 파악하여 일치하는 도표 고르기
+  question_type	17	이어질 말 파악하기
+  question_type	18	대화 참여자의 이어질 행동 추론하기
+  question_type	19	세부 내용 파악하여 일치하는 내용 고르기
+  question_type	20	중심 생각 추론하기
+  question_type	21	담화 상황 추론하기
+  question_type	22	화자의 의도나 목적 추론하기
+  question_type	23	참여자에 대해 추론하기
+  question_type	24	화자의 태도나 말하는 방식 추론하기
+  question_type	25	화제 파악하기
+  question_type	26	담화 전후의 내용 추론하기
+  question_type	27	중심 내용 추론하기
+  question_type	28	문맥 파악하여 빈칸에 알맞은 말 고르기
+  question_type	29	문맥 파악하여 의미가 비슷한 말 고르기
+  question_type	30	알맞은 순서로 배열한 것 고르기
+  question_type	31	인물의 태도나 심성 추론하기
+  question_type	32	필자의 태도 추론하기
+  question_type	33	필자의 의도나 목적 추론하기
+  question_type	34	빈칸에 알맞은 말 써서 문장 완성하기
+  question_type	35	자료를 설명하는 200~300자의 글 쓰기
+  question_type	36	주제에 대해 600~700자의 글 쓰기
+
+* 문제 번호별 지문/문제 유형
+{{TEMPLATE_DATA}}
+
 1. 데이터 구조 정의
   A. 지시문
     * 대상 : ※ [번호~번호] 형태와 <보기> 상자 안의 내용을 포함
@@ -8,7 +82,9 @@
       * instruction : ※, [N~N], 텍스트가 다 포함되어야 함.
         ex. ※ [1~2] ( )에 들어갈 말로 가장 알맞은 것을 고르십시오.
       * question_text : "가: ..., 나: ..." 형태의 대화 내용
+      * is_question_image : 문제 부분에 이미지가 포함되어 있으면 'Y', 아니면 'N'
       * "choices": ["① 식당", "② 은행", "③ 공원", "④ 서점"], * 선택지 번호는 '①, ②, ③, ④' 기호를 사용하되, ❶과 같이 검은색 원인 경우는 그대로 표기할 것.
+      * is_choices_image : choices 영역에 이미지가 포함되어 있으면 'Y', 아니면 'N'
       * no_list : 번호 목록, ex. [1, 2]
       * score : 점수, ex. 2
     * 출력 규칙
@@ -20,13 +96,16 @@
       * item_type : 'Q'
       * no : 문제 번호
       * score : 점수
-      * section : 읽기, 쓰기, ...
-      * type : 문제 유형으로 TOPIK 시험의 문제 유형을 정리
-      * question_text : 밑줄(underline)이 있는 경우 텍스트로 '_______________________'  와 같이 표시할 것.
-      * choices : 선택 옵션
+      * section : 상단에 정의 되어 있는 코드 값 이용
+      * passage_type : 지문/문제를 파악하고, 상단에 정의되어 있는 지문유형 코드값 을 이용
+      * question_type : 지문/문제를 파악하고, 상단에 정의되어 있는 문제유형 코드값 을 이용
+      * question_text : 밑줄(underline)이 있는 경우 텍스트로 '_______________________'  와 같이 표시할 것. 괄호는 그대로 괄호를 이용.
+      * is_question_image : 문제 부분에 이미지가 포함되어 있으면 'Y', 아니면 'N'
+      * choices : 선택 옵션
          * 선택 옵션의 종류는 텍스트와 이미지가 있으며, 이미지인 경우 번호 별로 crop해서 업로드하고 경로를 표시해줄 것.
-         * 선택 옵션의 번호는 아래와 같이 동그라미 형식으로 해줄 것
-         * "choices": ["① 식당", "② 은행", "③ 공원", "④ 서점"]
+         * 선택 옵션의 번호는 아래와 같이 동그라미 형식으로 해줄 것
+             ex. ["① 식당", "② 은행", "③ 공원", "④ 서점"]
+      * is_choices_image : choices 영역에 이미지가 포함되어 있으면 'Y', 아니면 'N'
       * correct_answer : 정답 (동그라미 형식이 아닌 숫자 형식으로 출력)
          * 정답은 문제를 읽고 판단하되, 모르는 경우 값을 비워 둘 것 (key 값은 있어야 함)
 

@@ -184,10 +184,14 @@ onMounted(() => {
 
     <!-- 문제 목록(JSON → 화면) — 추후 연동 -->
     <div class="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-gray-300">
-      <div class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2">
+      <div
+        class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2"
+      >
         <div>
           <span class="text-sm font-medium text-gray-700">문제 목록</span>
-          <span class="ml-2 text-xs text-gray-400">※ 상단 테이블에서 행을 선택하면 하단에 문제가 표시됩니다</span>
+          <span class="ml-2 text-xs text-gray-400"
+            >※ 상단 테이블에서 행을 선택하면 하단에 문제가 표시됩니다</span
+          >
         </div>
       </div>
       <div class="flex-1 overflow-y-auto">

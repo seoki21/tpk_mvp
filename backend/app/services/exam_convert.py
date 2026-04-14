@@ -13,10 +13,10 @@ from google import genai
 from app.config import (
     ANTHROPIC_API_KEY, ANTHROPIC_MODEL,
     GOOGLE_AI_API_KEY, GOOGLE_AI_MODEL,
-    UPLOAD_DIR,
 )
 from app.services.exam_file import get_file
 from app.services.api_usage import save_usage
+from app.services import r2_storage
 
 
 # Anthropic 비동기 클라이언트 싱글턴
@@ -52,16 +52,15 @@ def _get_google_client() -> genai.Client:
     return _google_client
 
 
-def _read_pdf_as_base64(file_path: str) -> str:
-    """PDF 파일을 읽어 base64 문자열로 반환한다. (동기 I/O)"""
-    with open(file_path, "rb") as f:
-        return base64.standard_b64encode(f.read()).decode("utf-8")
+def _read_pdf_as_base64(r2_key: str) -> str:
+    """R2에서 PDF 파일을 다운로드하여 base64 문자열로 반환한다. (동기 I/O)"""
+    data = r2_storage.download_bytes(r2_key)
+    return base64.standard_b64encode(data).decode("utf-8")
 
 
-def _read_pdf_bytes(file_path: str) -> bytes:
-    """PDF 파일을 읽어 바이트 데이터로 반환한다. (동기 I/O)"""
-    with open(file_path, "rb") as f:
-        return f.read()
+def _read_pdf_bytes(r2_key: str) -> bytes:
+    """R2에서 PDF 파일을 다운로드하여 바이트 데이터로 반환한다. (동기 I/O)"""
+    return r2_storage.download_bytes(r2_key)
 
 
 def _format_sse(event: str, data: dict) -> str:
@@ -112,31 +111,105 @@ def _get_section_name(section_code: str) -> Optional[str]:
         conn.close()
 
 
-def _get_prompt_by_section(section_code: str) -> str:
+def _get_template_data(exam_key: int, section_code: str) -> str:
+    """
+    tb_exam_template에서 해당 시험의 문제번호별 passage_type/question_type을 조회하여
+    프롬프트에 삽입할 참조 텍스트를 생성한다.
+
+    Args:
+        exam_key: 시험 PK
+        section_code: 영역 코드 (예: "15", "16")
+
+    Returns:
+        포맷된 참조 텍스트 (빈 문자열이면 템플릿 데이터 없음)
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # tb_exam_list에서 tpk_type, tpk_level 조회
+        cursor.execute(
+            "SELECT tpk_type, tpk_level FROM tb_exam_list WHERE exam_key = %s",
+            (exam_key,),
+        )
+        exam = cursor.fetchone()
+        if not exam or not exam["tpk_type"] or not exam["tpk_level"]:
+            return ""
+
+        tpk_type = int(exam["tpk_type"])
+        tpk_level = int(exam["tpk_level"])
+        section = int(section_code) if section_code else None
+        if section is None:
+            return ""
+
+        # tb_exam_template에서 문제번호별 passage_type/question_type 조회
+        cursor.execute(
+            """
+            SELECT t.question_no, t.passage_type, t.question_type,
+                   cp.code_name AS passage_type_name,
+                   cq.code_name AS question_type_name
+              FROM tb_exam_template t
+              LEFT JOIN tb_code cp ON cp.group_code = 'passage_type' AND cp.code = t.passage_type
+              LEFT JOIN tb_code cq ON cq.group_code = 'question_type' AND cq.code = t.question_type
+             WHERE t.tpk_type = %s AND t.tpk_level = %s AND t.section = %s
+               AND t.del_yn = 'N'
+             ORDER BY t.question_no
+            """,
+            (tpk_type, tpk_level, section),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return ""
+
+        # "  1번: passage_type=1(짧은 대화), question_type=1(맞는 대답 고르기)" 형식으로 포맷
+        lines = []
+        for row in rows:
+            pt_label = f"{row['passage_type']}({row['passage_type_name']})" if row["passage_type_name"] else str(row["passage_type"] or "")
+            qt_label = f"{row['question_type']}({row['question_type_name']})" if row["question_type_name"] else str(row["question_type"] or "")
+            lines.append(f"  {row['question_no']}번: passage_type={pt_label}, question_type={qt_label}")
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+    finally:
+        conn.close()
+
+
+def _get_prompt_by_section(exam_key: int, section_code: str) -> str:
     """
     영역 코드로 적절한 PDF 변환 프롬프트를 반환한다.
     tb_code에서 code_name을 조회한 뒤 매핑 테이블에서 프롬프트를 찾는다.
     매핑에 없는 영역은 기본 프롬프트(pdf_convert)를 사용한다.
+    프롬프트 내 {{TEMPLATE_DATA}} 플레이스홀더를 tb_exam_template 데이터로 치환한다.
 
     Args:
-        section_code: 영역 코드 (예: "1", "2")
+        exam_key: 시험 PK
+        section_code: 영역 코드 (예: "15", "16")
 
     Returns:
         프롬프트 텍스트
     """
     section_name = _get_section_name(section_code)
-    return _SECTION_PROMPT_MAP.get(section_name, _PDF_CONVERT_PROMPT)
+    prompt = _SECTION_PROMPT_MAP.get(section_name, _PDF_CONVERT_PROMPT)
+
+    # tb_exam_template 데이터로 프롬프트 치환
+    template_data = _get_template_data(exam_key, section_code)
+    if template_data:
+        prompt = prompt.replace("{{TEMPLATE_DATA}}", template_data)
+    else:
+        prompt = prompt.replace("{{TEMPLATE_DATA}}", "  (템플릿 데이터 없음 — AI가 지문/문제를 분석하여 직접 판단)")
+
+    return prompt
 
 
 def _get_pdf_file_info(pdf_key: int):
     """
-    PDF 파일 정보를 조회하고 경로를 확인한다.
+    PDF 파일 정보를 조회하고 R2 키를 확인한다.
 
     Args:
         pdf_key: PDF 파일 PK
 
     Returns:
-        (file_info, file_path) 튜플
+        (file_info, r2_key) 튜플 — r2_key는 R2 오브젝트 키(= file_path 컬럼 값)
 
     Raises:
         ValueError: 파일을 찾을 수 없는 경우
@@ -145,20 +218,21 @@ def _get_pdf_file_info(pdf_key: int):
     if not file_info:
         raise ValueError(f"PDF 파일을 찾을 수 없습니다 (pdf_key={pdf_key})")
 
-    file_path = os.path.join(UPLOAD_DIR, file_info["file_path"])
-    if not os.path.exists(file_path):
-        raise ValueError(f"PDF 파일이 존재하지 않습니다: {file_info['file_name']}")
+    r2_key = file_info["file_path"]
+    if not r2_storage.exists(r2_key):
+        raise ValueError(f"PDF 파일이 R2에 존재하지 않습니다: {file_info['file_name']}")
 
-    return file_info, file_path
+    return file_info, r2_key
 
 
-async def _convert_with_claude(file_info: dict, file_path: str, section: str = None) -> AsyncGenerator[str, None]:
+async def _convert_with_claude(file_info: dict, r2_key: str, exam_key: int = None, section: str = None) -> AsyncGenerator[str, None]:
     """
     Claude API 스트리밍으로 PDF를 JSON으로 변환한다.
 
     Args:
         file_info: 파일 메타데이터
-        file_path: PDF 파일 경로
+        r2_key: R2 오브젝트 키
+        exam_key: 시험 PK (tb_exam_template 조회용)
         section: 영역 (듣기/읽기) — 프롬프트 분기용
 
     Yields:
@@ -166,11 +240,11 @@ async def _convert_with_claude(file_info: dict, file_path: str, section: str = N
     """
     client = _get_async_client()
 
-    # PDF 파일을 base64로 인코딩 (블로킹 I/O → 별도 스레드)
-    pdf_data = await asyncio.to_thread(_read_pdf_as_base64, file_path)
+    # R2에서 PDF를 다운로드하여 base64 인코딩 (블로킹 I/O → 별도 스레드)
+    pdf_data = await asyncio.to_thread(_read_pdf_as_base64, r2_key)
 
-    # 영역 코드로 적절한 프롬프트 조회
-    prompt = _get_prompt_by_section(section)
+    # 영역 코드로 적절한 프롬프트 조회 (tb_exam_template 데이터 포함)
+    prompt = _get_prompt_by_section(exam_key, section)
 
     # start 이벤트 전송 — 변환 시작 알림
     yield _format_sse("start", {
@@ -234,13 +308,14 @@ async def _convert_with_claude(file_info: dict, file_path: str, section: str = N
         yield _format_sse("error", {"detail": f"PDF 변환 실패: {e.message}"})
 
 
-async def _convert_with_gemini(file_info: dict, file_path: str, section: str = None) -> AsyncGenerator[str, None]:
+async def _convert_with_gemini(file_info: dict, r2_key: str, exam_key: int = None, section: str = None) -> AsyncGenerator[str, None]:
     """
     Google Gemini API 스트리밍으로 PDF를 JSON으로 변환한다.
 
     Args:
         file_info: 파일 메타데이터
-        file_path: PDF 파일 경로
+        r2_key: R2 오브젝트 키
+        exam_key: 시험 PK (tb_exam_template 조회용)
         section: 영역 (듣기/읽기) — 프롬프트 분기용
 
     Yields:
@@ -248,11 +323,11 @@ async def _convert_with_gemini(file_info: dict, file_path: str, section: str = N
     """
     client = _get_google_client()
 
-    # PDF 파일을 바이트로 읽기 (블로킹 I/O → 별도 스레드)
-    pdf_bytes = await asyncio.to_thread(_read_pdf_bytes, file_path)
+    # R2에서 PDF를 다운로드하여 바이트로 읽기 (블로킹 I/O → 별도 스레드)
+    pdf_bytes = await asyncio.to_thread(_read_pdf_bytes, r2_key)
 
-    # 영역 코드로 적절한 프롬프트 조회
-    prompt = _get_prompt_by_section(section)
+    # 영역 코드로 적절한 프롬프트 조회 (tb_exam_template 데이터 포함)
+    prompt = _get_prompt_by_section(exam_key, section)
 
     # start 이벤트 전송
     yield _format_sse("start", {
@@ -321,14 +396,14 @@ async def convert_pdf_to_json_stream(
     Raises:
         ValueError: API 키 미설정, 파일 미존재, 지원하지 않는 제공자
     """
-    # 공통: PDF 파일 정보 조회 및 경로 확인
-    file_info, file_path = _get_pdf_file_info(pdf_key)
+    # 공통: PDF 파일 정보 조회 및 R2 키 확인
+    file_info, r2_key = _get_pdf_file_info(pdf_key)
 
     if ai_provider == "gemini":
-        async for event in _convert_with_gemini(file_info, file_path, section):
+        async for event in _convert_with_gemini(file_info, r2_key, exam_key, section):
             yield event
     elif ai_provider == "claude":
-        async for event in _convert_with_claude(file_info, file_path, section):
+        async for event in _convert_with_claude(file_info, r2_key, exam_key, section):
             yield event
     else:
         raise ValueError(f"지원하지 않는 AI 제공자입니다: {ai_provider}")

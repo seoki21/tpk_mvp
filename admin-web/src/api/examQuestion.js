@@ -20,7 +20,9 @@ export function getQuestionsAndInstructions(examKey, config) {
  * @param {Object} data - { questions: [...], instructions: [...] }
  */
 export function bulkSave(examKey, data) {
-  return api.post(`/api/v1/exam-list/${examKey}/questions/bulk-save`, data, { timeout: API_TIMEOUT_LONG });
+  return api.post(`/api/v1/exam-list/${examKey}/questions/bulk-save`, data, {
+    timeout: API_TIMEOUT_LONG
+  });
 }
 
 /**
@@ -31,7 +33,10 @@ export function bulkSave(examKey, data) {
  * @param {string[]|null} locales - 생성할 locale 코드 목록 (null이면 ko만)
  */
 export function generateFeedback(examKey, aiProvider = 'claude', locales = null) {
-  return api.post(`/api/v1/exam-feedback/${examKey}/generate`, { ai_provider: aiProvider, locales });
+  return api.post(`/api/v1/exam-feedback/${examKey}/generate`, {
+    ai_provider: aiProvider,
+    locales
+  });
 }
 
 /**
@@ -42,13 +47,22 @@ export function generateFeedback(examKey, aiProvider = 'claude', locales = null)
  * @param {string[]|null} locales - 생성할 locale 코드 목록 (null이면 ko만)
  * @param {string|null} section - 영역명 (듣기/읽기 — 프롬프트 분기용)
  */
-export function generateFeedbackSingle(questionJson, aiProvider = 'claude', locales = null, section = null) {
-  return api.post('/api/v1/exam-feedback/generate-single', {
-    question_json: questionJson,
-    ai_provider: aiProvider,
-    locales,
-    section,
-  }, { timeout: API_TIMEOUT_AI });
+export function generateFeedbackSingle(
+  questionJson,
+  aiProvider = 'claude',
+  locales = null,
+  section = null
+) {
+  return api.post(
+    '/api/v1/exam-feedback/generate-single',
+    {
+      question_json: questionJson,
+      ai_provider: aiProvider,
+      locales,
+      section
+    },
+    { timeout: API_TIMEOUT_AI }
+  );
 }
 
 /**
@@ -59,7 +73,10 @@ export function generateFeedbackSingle(questionJson, aiProvider = 'claude', loca
  * @param {string} feedbackJson - 피드백 JSON 문자열
  */
 export function saveFeedbackSingle(examKey, questionNo, feedbackJson) {
-  return api.post(`/api/v1/exam-feedback/${examKey}/save-single`, { question_no: questionNo, feedback_json: feedbackJson });
+  return api.post(`/api/v1/exam-feedback/${examKey}/save-single`, {
+    question_no: questionNo,
+    feedback_json: feedbackJson
+  });
 }
 
 /**
@@ -75,7 +92,7 @@ export function updateQuestionSingle(examKey, questionNo, questionJson, feedback
   return api.post(`/api/v1/exam-feedback/${examKey}/update-single`, {
     question_no: questionNo,
     question_json: questionJson,
-    feedback_json: feedbackJson,
+    feedback_json: feedbackJson
   });
 }
 
@@ -85,7 +102,11 @@ export function updateQuestionSingle(examKey, questionNo, questionJson, feedback
  * @param {number} pdfKey - PDF 파일키 PK
  */
 export function cropImages(examKey, pdfKey) {
-  return api.post(`/api/v1/exam-list/${examKey}/images/crop`, { pdf_key: pdfKey }, { timeout: API_TIMEOUT_AI });
+  return api.post(
+    `/api/v1/exam-list/${examKey}/images/crop`,
+    { pdf_key: pdfKey },
+    { timeout: API_TIMEOUT_AI }
+  );
 }
 
 /**
@@ -95,6 +116,47 @@ export function cropImages(examKey, pdfKey) {
  */
 export function renameCropImages(examKey, renameMap) {
   return api.post(`/api/v1/exam-list/${examKey}/images/rename`, { rename_map: renameMap });
+}
+
+/**
+ * PDF 파일의 총 페이지 수를 조회한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {number} pdfKey - PDF 파일키 PK
+ */
+export function getPdfPageCount(examKey, pdfKey) {
+  return api.get(`/api/v1/exam-list/${examKey}/images/pdf-page-count`, {
+    params: { pdf_key: pdfKey }
+  });
+}
+
+/**
+ * PDF 특정 페이지를 PNG 이미지 Blob으로 가져온다.
+ * JWT 인증이 필요하므로 axios blob 방식으로 fetch한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {number} pdfKey - PDF 파일키 PK
+ * @param {number} page - 페이지 번호 (1-based)
+ * @param {number} dpi - 렌더링 해상도 (기본 150)
+ * @returns {Promise<Blob>} PNG 이미지 Blob
+ */
+export function fetchPdfPageImage(examKey, pdfKey, page, dpi = 150) {
+  return api.get(`/api/v1/exam-list/${examKey}/images/pdf-page`, {
+    params: { pdf_key: pdfKey, page, dpi },
+    responseType: 'blob'
+  });
+}
+
+/**
+ * 사용자가 지정한 좌표로 PDF에서 이미지를 수동 crop한다.
+ * @param {number} examKey - 시험키 PK
+ * @param {number} pdfKey - PDF 파일키 PK
+ * @param {Array} crops - [{ page, x, y, w, h, filename }] (좌표는 300dpi 기준)
+ */
+export function cropManualImages(examKey, pdfKey, crops) {
+  return api.post(
+    `/api/v1/exam-list/${examKey}/images/crop-manual`,
+    { pdf_key: pdfKey, crops },
+    { timeout: API_TIMEOUT_AI }
+  );
 }
 
 /**
@@ -110,7 +172,13 @@ export function renameCropImages(examKey, renameMap) {
  * @param {string} aiProvider - AI 제공자 ('claude' 또는 'gemini')
  * @param {string|null} section - 영역 (듣기/읽기) — 프롬프트 분기용
  */
-export async function convertPdfToJsonStream(examKey, pdfKey, onEvent, aiProvider = 'claude', section = null) {
+export async function convertPdfToJsonStream(
+  examKey,
+  pdfKey,
+  onEvent,
+  aiProvider = 'claude',
+  section = null
+) {
   /* API base URL — 개발 환경에서는 빈 문자열(Vite 프록시 사용) */
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
 

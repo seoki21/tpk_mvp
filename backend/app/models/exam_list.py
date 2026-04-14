@@ -10,6 +10,7 @@ class ExamListCreate(BaseModel):
     """시험문항 생성 요청 스키마"""
     exam_year: str = Field(..., max_length=4, description="시험연도")
     exam_type: str = Field(..., max_length=20, description="시험유형 코드")
+    tpk_type: Optional[int] = Field(None, description="시험종류 코드 (tb_code.topik_type)")
     round: Optional[int] = Field(None, description="회차")
     tpk_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
     section: str = Field(..., max_length=20, description="영역 코드")
@@ -19,6 +20,7 @@ class ExamListUpdate(BaseModel):
     """시험문항 수정 요청 스키마"""
     exam_year: Optional[str] = Field(None, max_length=4, description="시험연도")
     exam_type: Optional[str] = Field(None, max_length=20, description="시험유형 코드")
+    tpk_type: Optional[int] = Field(None, description="시험종류 코드 (tb_code.topik_type)")
     round: Optional[int] = Field(None, description="회차")
     tpk_level: Optional[str] = Field(None, max_length=10, description="토픽레벨 코드")
     section: Optional[str] = Field(None, max_length=20, description="영역 코드")

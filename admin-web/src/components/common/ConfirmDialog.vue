@@ -22,19 +22,15 @@ const emit = defineEmits(['confirm', 'cancel']);
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+    <div v-if="visible" class="fixed inset-y-0 right-0 z-[60] flex items-center justify-center overflow-auto bg-black/50" style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))">
       <div class="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
         <!-- 메시지 -->
         <p class="mb-6 text-center text-gray-700">{{ message }}</p>
 
         <!-- 버튼 영역 -->
         <div class="flex items-center justify-center gap-3">
-          <button class="btn btn-sm btn-primary px-6" @click="emit('confirm')">
-            확인
-          </button>
-          <button class="btn btn-sm btn-secondary px-6" @click="emit('cancel')">
-            취소
-          </button>
+          <button class="btn btn-sm btn-primary px-6" @click="emit('confirm')">확인</button>
+          <button class="btn btn-sm btn-secondary px-6" @click="emit('cancel')">취소</button>
         </div>
       </div>
     </div>

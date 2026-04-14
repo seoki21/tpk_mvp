@@ -13,38 +13,70 @@ import ExamConvertPopup from '@/components/examQuestion/ExamConvertPopup.vue';
 import ExamQuestionHeader from '@/components/examQuestion/ExamQuestionHeader.vue';
 import ExamInstructionCard from '@/components/examQuestion/ExamInstructionCard.vue';
 import ExamQuestionCard from '@/components/examQuestion/ExamQuestionCard.vue';
+import ImageCropPopup from '@/components/examQuestion/ImageCropPopup.vue';
 import JsonEditorPanel from '@/components/examQuestion/JsonEditorPanel.vue';
 
 const {
   store,
   /* 확인 다이얼로그 */
-  showConfirm, confirmMessage, handleConfirm, handleCancel,
+  showConfirm,
+  confirmMessage,
+  handleConfirm,
+  handleCancel,
   /* JSON 편집 */
-  getEditState, handleJsonEditFromPanel, setJsonTab,
-  getActiveJsonText, getActiveJsonError,
+  getEditState,
+  handleJsonEditFromPanel,
+  setJsonTab,
+  getActiveJsonText,
+  getActiveJsonError,
   /* 통합 selectbox + API 호출 팝업 */
   showConvertPopup,
-  handleCombinedChange, handleConvertClick,
-  handleConvertPopupClose, handleConvertPopupSaved,
+  handleCombinedChange,
+  handleConvertClick,
+  handleConvertPopupClose,
+  handleConvertPopupSaved,
   /* 저장 */
   handleSaveAll,
   /* 데이터 추출 */
-  getCorrectAnswer, getFeedbackData,
+  getCorrectAnswer,
+  getFeedbackData,
   /* 피드백 생성 (locale 선택 팝업) */
-  feedbackGenerating, showLocaleDialog, existingFeedbackLocales, handleLocaleConfirm, handleLocaleCancel,
+  feedbackGenerating,
+  showLocaleDialog,
+  existingFeedbackLocales,
+  handleLocaleConfirm,
+  handleLocaleCancel,
   handleGenerateFeedbackForItem,
   /* 단건 저장 */
-  itemSaving, handleSaveItemSingle,
+  itemSaving,
+  handleSaveItemSingle,
   /* 이미지 생성 */
-  imageGenerating, handleGenerateImages,
+  imageGenerating,
+  handleGenerateImages,
+  /* JSON 파일 임포트 */
+  handleImportQuestionJson,
+  handleImportFeedbackJson,
+  /* 수동 이미지 생성 */
+  showImageCropPopup,
+  cropPopupImageItems,
+  handleManualGenerateImages,
+  handleCropApply,
+  handleCropPopupClose,
+  /* 코드 목록 (셀렉트박스) */
+  sectionCodes,
+  passageTypeCodes,
+  questionTypeCodes,
+  loadCodeOptions,
+  handleCodeFieldChange,
   /* 기타 */
   handleToggleJsonFilter,
-  handleRetryExamOptions,
+  handleRetryExamOptions
 } = useExamQuestionCommon();
 
 /* ========== 초기 데이터 로드 ========== */
 onMounted(() => {
   store.fetchExamOptions();
+  loadCodeOptions();
 });
 </script>
 
@@ -58,6 +90,9 @@ onMounted(() => {
       :store="store"
       @combined-change="handleCombinedChange"
       @convert-click="handleConvertClick"
+      @manual-generate-images="handleManualGenerateImages"
+      @import-question-json="handleImportQuestionJson"
+      @import-feedback-json="handleImportFeedbackJson"
       @generate-images="handleGenerateImages"
       @save-all="handleSaveAll"
       @toggle-json-filter="handleToggleJsonFilter"
@@ -66,10 +101,14 @@ onMounted(() => {
 
     <!-- 문제 목록(JSON → 화면) -->
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-gray-300">
-      <div class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2">
+      <div
+        class="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-50 px-4 py-2"
+      >
         <div>
           <span class="text-sm font-medium text-gray-700">문제 목록</span>
-          <span class="ml-2 text-xs text-gray-400">※ JSON 데이터를 수정하면 우측 화면에서 실시간으로 결과를 확인할 수 있습니다</span>
+          <span class="ml-2 text-xs text-gray-400"
+            >※ JSON 데이터를 수정하면 우측 화면에서 실시간으로 결과를 확인할 수 있습니다</span
+          >
         </div>
       </div>
 
@@ -90,7 +129,11 @@ onMounted(() => {
 
         <!-- 항목 목록 -->
         <div v-if="!store.loading && store.mergedItems.length > 0" class="divide-y divide-gray-200">
-          <div v-for="item in store.mergedItems" :key="item._type + '_' + (item._type === 'question' ? item.question_no : item.ins_no)" class="flex gap-4 p-4">
+          <div
+            v-for="item in store.mergedItems"
+            :key="item._type + '_' + (item._type === 'question' ? item.question_no : item.ins_no)"
+            class="flex gap-4 p-4"
+          >
             <!-- 좌측: JSON 편집 영역 (40%) -->
             <JsonEditorPanel
               :item-type="item._type"
@@ -120,6 +163,10 @@ onMounted(() => {
                 :parsed="getEditState(item).parsed"
                 :correct-answer="getCorrectAnswer(item)"
                 :feedback-data="getFeedbackData(item)"
+                :section-codes="sectionCodes"
+                :passage-type-codes="passageTypeCodes"
+                :question-type-codes="questionTypeCodes"
+                @code-change="handleCodeFieldChange"
               />
             </div>
           </div>
@@ -152,5 +199,14 @@ onMounted(() => {
       @saved="handleConvertPopupSaved"
     />
 
+    <!-- 수동 이미지 생성 팝업 -->
+    <ImageCropPopup
+      :visible="showImageCropPopup"
+      :exam-key="store.selectedExamKey"
+      :pdf-key="store.selectedPdfKey"
+      :image-items="cropPopupImageItems"
+      @apply="handleCropApply"
+      @close="handleCropPopupClose"
+    />
   </div>
 </template>

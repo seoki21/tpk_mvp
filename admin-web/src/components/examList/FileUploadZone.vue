@@ -55,11 +55,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits([
-  'file-select',
-  'file-delete',
-  'pending-remove'
-]);
+const emit = defineEmits(['file-select', 'file-delete', 'pending-remove']);
 
 /** 파일 선택 input ref */
 const fileInput = ref(null);
@@ -131,7 +127,9 @@ const dragColorClass = {
 <template>
   <div class="border-t border-gray-200 pt-4">
     <div class="mb-3 flex items-center justify-between">
-      <label class="text-sm font-medium text-gray-700">{{ sectionLabel || `문제(${fileTypeLabel})` }}</label>
+      <label class="text-sm font-medium text-gray-700">{{
+        sectionLabel || `문제(${fileTypeLabel})`
+      }}</label>
       <button
         type="button"
         class="rounded px-3 py-1.5 text-xs text-white"
@@ -174,7 +172,9 @@ const dragColorClass = {
           class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2"
         >
           <div class="flex min-w-0 flex-1 items-center gap-2">
-            <span class="text-xs font-semibold" :class="labelColorClass[accentColor]">{{ fileTypeLabel }}</span>
+            <span class="text-xs font-semibold" :class="labelColorClass[accentColor]">{{
+              fileTypeLabel
+            }}</span>
             <slot name="file-link" :file="file">
               <span class="truncate text-sm text-gray-700">{{ file.file_name }}</span>
             </slot>
@@ -200,7 +200,9 @@ const dragColorClass = {
           class="flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2"
         >
           <div class="flex min-w-0 flex-1 items-center gap-2">
-            <span class="text-xs font-semibold" :class="labelColorClass[accentColor]">{{ fileTypeLabel }}</span>
+            <span class="text-xs font-semibold" :class="labelColorClass[accentColor]">{{
+              fileTypeLabel
+            }}</span>
             <span class="truncate text-sm text-gray-700">{{ file.name }}</span>
             <span class="shrink-0 text-xs text-gray-400">
               {{ formatFileSize(file.size) }}
@@ -218,9 +220,7 @@ const dragColorClass = {
 
       <!-- 안내 문구 (파일이 없을 때) -->
       <div
-        v-if="
-          (isEditMode && fileList.length === 0) || (!isEditMode && pendingFiles.length === 0)
-        "
+        v-if="(isEditMode && fileList.length === 0) || (!isEditMode && pendingFiles.length === 0)"
         class="py-4"
       >
         <p v-if="!enabled" class="text-sm">

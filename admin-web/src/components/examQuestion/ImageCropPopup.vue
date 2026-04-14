@@ -1,89 +1,186 @@
 <!--
-  이미지 크롭 팝업 컴포넌트
-  - 기출문항 관리에서 '이미지 생성' 버튼 클릭 시 모달로 표시
-  - 상단: 이미지 타입 버튼 5개 + 스크롤/크롭 모드 토글
-  - 본문: PDF 뷰어 + crop 오버레이 (크롭 모드일 때만)
-  - 모드 전환: 스크롤 모드(기본) — PDF 스크롤/확대 가능, 크롭 모드 — 드래그로 영역 선택
+  수동 이미지 생성 팝업 컴포넌트 (다중 문항 지원)
+  - PDF 페이지를 이미지(PNG)로 렌더링하여 표시
+  - 상단 문항 선택 탭으로 여러 문항을 전환하며 작업
+  - 이미지 타입(문항이미지/선택지1~4) 별로 독립적인 crop 영역 관리
+  - cropDataMap 키: "{문항번호}_{이미지타입}" (예: "15_question", "15_choice1")
+  - 페이지 네비게이션(이전/다음/직접입력)
+  - "적용" 버튼으로 모든 문항의 crop 데이터를 부모에게 전달
 -->
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { getInlineViewUrl } from '@/api/examFile';
+import { ref, reactive, computed, watch } from 'vue';
+import { fetchPdfPageImage, getPdfPageCount } from '@/api/examQuestion';
 
 const props = defineProps({
   /** 팝업 표시 여부 */
-  visible: {
-    type: Boolean,
-    required: true
-  },
-  /** 시험키 */
-  examKey: {
-    type: Number,
-    default: null
-  },
-  /** PDF 파일키 */
-  pdfKey: {
-    type: Number,
-    default: null
-  },
-  /** 문항 정보 (question_no 등) */
-  item: {
-    type: Object,
-    default: null
-  }
+  visible: { type: Boolean, required: true },
+  /** 시험키 PK */
+  examKey: { type: Number, default: null },
+  /** PDF 파일키 PK */
+  pdfKey: { type: Number, default: null },
+  /** 이미지가 필요한 문항 목록 (composable에서 전달) */
+  imageItems: { type: Array, default: () => [] }
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'apply']);
 
-/** 현재 선택된 이미지 타입 버튼 */
+/* ========== 문항 선택 탭 ========== */
+
+/** 현재 선택된 문항 인덱스 */
+const selectedItemIdx = ref(0);
+
+/** 현재 선택된 문항 정보 */
+const selectedItem = computed(() => props.imageItems[selectedItemIdx.value] || null);
+
+/** 현재 선택된 문항 번호 */
+const selectedNo = computed(() => selectedItem.value?.no || 0);
+
+/** 현재 문항에 필요한 이미지 타입 버튼 목록 (동적 생성) */
+const activeImageTypeButtons = computed(() => {
+  const item = selectedItem.value;
+  if (!item) return [];
+  const buttons = [];
+  if (item.hasQuestionImg) {
+    buttons.push({ key: 'question', label: '문항이미지' });
+  }
+  if (item.hasChoicesImg) {
+    const choiceCount = item.parsed?.choices?.length || 4;
+    for (let i = 1; i <= choiceCount; i++) {
+      buttons.push({ key: `choice${i}`, label: `${i}번이미지` });
+    }
+  }
+  return buttons;
+});
+
+/* ========== 이미지 타입 선택 ========== */
 const selectedImageType = ref('question');
 
-/** 이미지 타입 버튼 목록 */
-const imageTypeButtons = [
-  { key: 'question', label: '문항이미지' },
-  { key: 'choice1', label: '1번이미지' },
-  { key: 'choice2', label: '2번이미지' },
-  { key: 'choice3', label: '3번이미지' },
-  { key: 'choice4', label: '4번이미지' }
-];
+/* ========== 모드: 스크롤 / 크롭 ========== */
+const mode = ref('crop');
 
-/** 모드: 'scroll' (PDF 스크롤/확대) | 'crop' (영역 선택) */
-const mode = ref('scroll');
+/* ========== 페이지 네비게이션 ========== */
+const currentPage = ref(1);
+const totalPages = ref(0);
+const pageLoading = ref(false);
+const pageImageUrl = ref('');
 
-/** PDF 인라인 뷰어 URL */
-const pdfUrl = computed(() => {
-  if (props.examKey && props.pdfKey) {
-    return getInlineViewUrl(props.examKey, props.pdfKey);
-  }
-  return '';
-});
+/* ========== crop 영역 (문항번호_이미지타입별 독립 관리) ========== */
+/** 키: "{no}_{imageType}" → { page, left, top, width, height } */
+const cropDataMap = reactive({});
 
-/** 문항 번호 표시 */
-const questionLabel = computed(() => {
-  if (!props.item) return '';
-  return `${props.item.question_no}번`;
-});
+/** cropDataMap 키 생성 헬퍼 */
+function cropKey(no, imageType) {
+  return `${no}_${imageType}`;
+}
 
-/* ========== crop 영역 드래그 (크롭 모드에서만 동작) ========== */
+/** 현재 선택된 문항+이미지타입의 cropDataMap 키 */
+const currentCropKey = computed(() => cropKey(selectedNo.value, selectedImageType.value));
 
-/** crop 오버레이 컨테이너 ref */
-const cropContainer = ref(null);
-
-/** 드래그 상태 */
+/** 현재 드래그 중인 crop rect (화면 표시용) */
+const cropRect = ref({ left: 0, top: 0, width: 0, height: 0 });
 const isDragging = ref(false);
-
-/** 드래그 시작 좌표 */
 const dragStart = ref({ x: 0, y: 0 });
 
-/** 현재 crop 영역 (CSS용) */
-const cropRect = ref({ left: 0, top: 0, width: 0, height: 0 });
+/** crop 오버레이 + 이미지 wrapper ref */
+const imageWrapperRef = ref(null);
+/** 실제 <img> 요소 ref — naturalWidth 계산용 */
+const imgRef = ref(null);
 
-/** crop 영역이 설정되었는지 여부 */
+/** crop 영역이 유효한지 (5px 이상) */
 const hasCropArea = computed(() => cropRect.value.width > 5 && cropRect.value.height > 5);
 
-/** 마우스 다운 — crop 드래그 시작 */
+/** 정의된 crop 총 개수 (적용 버튼 활성화 조건) */
+const definedCropCount = computed(() => Object.keys(cropDataMap).length);
+
+/* ========== 페이지 이미지 로드 ========== */
+
+async function loadPageImage() {
+  if (!props.examKey || !props.pdfKey || !currentPage.value) return;
+  pageLoading.value = true;
+
+  if (pageImageUrl.value) {
+    URL.revokeObjectURL(pageImageUrl.value);
+    pageImageUrl.value = '';
+  }
+
+  try {
+    const blob = await fetchPdfPageImage(props.examKey, props.pdfKey, currentPage.value, 150);
+    pageImageUrl.value = URL.createObjectURL(new Blob([blob], { type: 'image/png' }));
+  } catch (err) {
+    console.error('[ImageCropPopup] 페이지 이미지 로드 실패:', err);
+    pageImageUrl.value = '';
+  } finally {
+    pageLoading.value = false;
+  }
+}
+
+async function initPopup() {
+  selectedItemIdx.value = 0;
+  currentPage.value = 1;
+  totalPages.value = 0;
+  mode.value = 'crop';
+  clearAllCrops();
+  cropRect.value = { left: 0, top: 0, width: 0, height: 0 };
+
+  // 첫 문항의 첫 이미지 타입 선택
+  if (activeImageTypeButtons.value.length > 0) {
+    selectedImageType.value = activeImageTypeButtons.value[0].key;
+  } else {
+    selectedImageType.value = 'question';
+  }
+
+  if (!props.examKey || !props.pdfKey) return;
+
+  try {
+    const res = await getPdfPageCount(props.examKey, props.pdfKey);
+    totalPages.value = res.data?.page_count || 0;
+  } catch (err) {
+    console.error('[ImageCropPopup] 페이지 수 조회 실패:', err);
+  }
+
+  if (totalPages.value > 0) {
+    await loadPageImage();
+  }
+}
+
+function prevPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    loadPageImage();
+  }
+}
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    loadPageImage();
+  }
+}
+
+function onPageInput(e) {
+  const val = parseInt(e.target.value, 10);
+  if (val >= 1 && val <= totalPages.value) {
+    currentPage.value = val;
+    loadPageImage();
+  }
+}
+
+/* ========== 문항 탭 전환 ========== */
+
+function selectItemTab(idx) {
+  selectedItemIdx.value = idx;
+  // 해당 문항의 첫 이미지타입 선택
+  if (activeImageTypeButtons.value.length > 0) {
+    selectedImageType.value = activeImageTypeButtons.value[0].key;
+    restoreCropForCurrentKey();
+  }
+}
+
+/* ========== crop 드래그 로직 ========== */
+
 function handleMouseDown(e) {
-  if (mode.value !== 'crop' || !cropContainer.value) return;
-  const rect = cropContainer.value.getBoundingClientRect();
+  if (mode.value !== 'crop' || !imageWrapperRef.value) return;
+  const rect = imageWrapperRef.value.getBoundingClientRect();
   isDragging.value = true;
   dragStart.value = {
     x: e.clientX - rect.left,
@@ -97,10 +194,9 @@ function handleMouseDown(e) {
   };
 }
 
-/** 마우스 이동 — crop 영역 업데이트 */
 function handleMouseMove(e) {
-  if (!isDragging.value || !cropContainer.value) return;
-  const rect = cropContainer.value.getBoundingClientRect();
+  if (!isDragging.value || !imageWrapperRef.value) return;
+  const rect = imageWrapperRef.value.getBoundingClientRect();
   const currentX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
   const currentY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
 
@@ -112,9 +208,22 @@ function handleMouseMove(e) {
   };
 }
 
-/** 마우스 업 — crop 드래그 종료 */
 function handleMouseUp() {
+  if (!isDragging.value) return;
   isDragging.value = false;
+
+  // 유효한 crop 영역이면 현재 문항+이미지타입에 저장
+  if (hasCropArea.value) {
+    cropDataMap[currentCropKey.value] = {
+      no: selectedNo.value,
+      imageType: selectedImageType.value,
+      page: currentPage.value,
+      left: cropRect.value.left,
+      top: cropRect.value.top,
+      width: cropRect.value.width,
+      height: cropRect.value.height
+    };
+  }
 }
 
 /** crop 영역 CSS 스타일 */
@@ -125,20 +234,92 @@ const cropStyle = computed(() => ({
   height: cropRect.value.height + 'px'
 }));
 
-/** crop 영역 초기화 */
-function clearCrop() {
+/** 현재 키의 저장된 crop 복원 */
+function restoreCropForCurrentKey() {
+  const saved = cropDataMap[currentCropKey.value];
+  if (saved) {
+    cropRect.value = {
+      left: saved.left,
+      top: saved.top,
+      width: saved.width,
+      height: saved.height
+    };
+    if (saved.page !== currentPage.value) {
+      currentPage.value = saved.page;
+      loadPageImage();
+    }
+  } else {
+    cropRect.value = { left: 0, top: 0, width: 0, height: 0 };
+  }
+}
+
+/** 이미지타입 버튼 클릭 핸들러 */
+function selectImageType(key) {
+  selectedImageType.value = key;
+  restoreCropForCurrentKey();
+}
+
+/** 현재 선택의 crop 초기화 */
+function clearCurrentCrop() {
+  delete cropDataMap[currentCropKey.value];
   cropRect.value = { left: 0, top: 0, width: 0, height: 0 };
 }
 
-/** 팝업 열릴 때 초기화 */
+/** 전체 crop 초기화 */
+function clearAllCrops() {
+  Object.keys(cropDataMap).forEach((k) => delete cropDataMap[k]);
+  cropRect.value = { left: 0, top: 0, width: 0, height: 0 };
+}
+
+/** 특정 문항의 crop 완료 개수 */
+function getItemCropCount(no) {
+  return Object.keys(cropDataMap).filter((k) => k.startsWith(`${no}_`)).length;
+}
+
+/** 특정 문항+이미지타입의 crop 상태 텍스트 */
+function getCropStatusForKey(no, imageType) {
+  const saved = cropDataMap[cropKey(no, imageType)];
+  if (!saved) return '미지정';
+  return `p${saved.page} (${Math.round(saved.width)}x${Math.round(saved.height)})`;
+}
+
+/* ========== 적용 ========== */
+
+function handleApply() {
+  if (!imgRef.value) return;
+
+  const displayScale = imgRef.value.naturalWidth / imgRef.value.clientWidth;
+  const dpiScale = 2;
+  const totalScale = displayScale * dpiScale;
+
+  const crops = [];
+  for (const [key, data] of Object.entries(cropDataMap)) {
+    crops.push({
+      no: data.no,
+      imageType: data.imageType,
+      page: data.page,
+      x: Math.round(data.left * totalScale),
+      y: Math.round(data.top * totalScale),
+      w: Math.round(data.width * totalScale),
+      h: Math.round(data.height * totalScale)
+    });
+  }
+
+  emit('apply', { crops });
+}
+
+/* ========== 팝업 열림/닫힘 ========== */
+
 watch(
   () => props.visible,
   (val) => {
     if (val) {
-      selectedImageType.value = 'question';
-      mode.value = 'scroll';
-      clearCrop();
-      isDragging.value = false;
+      initPopup();
+    } else {
+      if (pageImageUrl.value) {
+        URL.revokeObjectURL(pageImageUrl.value);
+        pageImageUrl.value = '';
+      }
     }
   }
 );
@@ -146,13 +327,15 @@ watch(
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="mx-4 flex h-[85vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
+    <div v-if="visible" class="fixed inset-y-0 right-0 z-50 flex items-center justify-center overflow-auto bg-black/50" style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))"
+      <div class="mx-4 flex h-[90vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
         <!-- 헤더 -->
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <div>
-            <h3 class="text-sm font-bold text-gray-800">이미지 생성</h3>
-            <p class="mt-0.5 text-xs text-gray-500">{{ questionLabel }}</p>
+            <h3 class="text-sm font-bold text-gray-800">수동 이미지 생성</h3>
+            <p class="mt-0.5 text-xs text-gray-500">
+              PDF에서 드래그하여 이미지 영역을 직접 선택합니다.
+            </p>
           </div>
           <button
             class="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -164,106 +347,199 @@ watch(
           </button>
         </div>
 
-        <!-- 이미지 타입 버튼 + 모드 토글 -->
+        <!-- 문항 선택 탭 -->
+        <div v-if="imageItems.length > 1" class="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-5 py-2">
+          <span class="mr-2 text-xs font-medium text-gray-500">문항:</span>
+          <button
+            v-for="(imgItem, idx) in imageItems"
+            :key="imgItem.no"
+            class="relative rounded px-3 py-1 text-xs font-medium transition-colors"
+            :class="
+              selectedItemIdx === idx
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-100'
+            "
+            @click="selectItemTab(idx)"
+          >
+            {{ imgItem.no }}번
+            <!-- 해당 문항의 crop 완료 개수 표시 -->
+            <span
+              v-if="getItemCropCount(imgItem.no) > 0"
+              class="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] text-white ring-1 ring-white"
+            >
+              {{ getItemCropCount(imgItem.no) }}
+            </span>
+          </button>
+        </div>
+
+        <!-- 이미지 타입 버튼 + 모드 토글 + 페이지 네비게이션 -->
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-2">
-          <!-- 이미지 타입 버튼 5개 -->
-          <div class="flex items-center gap-2">
+          <!-- 이미지 타입 버튼 (현재 문항에 필요한 타입만 표시) -->
+          <div class="flex items-center gap-1.5">
             <button
-              v-for="btn in imageTypeButtons"
+              v-for="btn in activeImageTypeButtons"
               :key="btn.key"
-              class="btn btn-xs"
-              :class="selectedImageType === btn.key ? 'btn-primary' : 'btn-secondary'"
-              @click="selectedImageType = btn.key"
+              class="relative rounded px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                selectedImageType === btn.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              "
+              @click="selectImageType(btn.key)"
             >
               {{ btn.label }}
+              <span
+                v-if="cropDataMap[cropKey(selectedNo, btn.key)]"
+                class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-green-500 ring-1 ring-white"
+              ></span>
             </button>
           </div>
 
-          <!-- 모드 토글: 스크롤 / 크롭 -->
-          <div class="flex items-center gap-1 rounded-md border border-gray-300 bg-gray-50 p-0.5">
-            <!-- 스크롤 모드 -->
+          <!-- 페이지 네비게이션 -->
+          <div class="flex items-center gap-2">
             <button
-              class="flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors"
-              :class="mode === 'scroll' ? 'bg-white font-medium text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-              @click="mode = 'scroll'"
+              :disabled="currentPage <= 1"
+              class="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:text-gray-300"
+              @click="prevPage"
             >
-              <!-- 손바닥(pan) 아이콘 -->
-              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.05 4.575a1.575 1.575 0 10-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 013.15 0v1.5m-3.15 0l.075 5.925m3.075-5.925v2.925m0-2.925a1.575 1.575 0 013.15 0V8.25m-3.15-2.175a1.575 1.575 0 013.15 0v5.4m-3.15-5.4v5.4m0 0v.9A6.075 6.075 0 016.9 20.55h-.45A6.075 6.075 0 010 14.475V8.25" />
-              </svg>
-              스크롤
+              ◀
             </button>
-            <!-- 크롭 모드 -->
+            <div class="flex items-center gap-1 text-xs text-gray-600">
+              <input
+                :value="currentPage"
+                type="number"
+                min="1"
+                :max="totalPages"
+                class="w-10 rounded border border-gray-300 px-1 py-0.5 text-center text-xs"
+                @change="onPageInput"
+              />
+              <span>/ {{ totalPages }} 페이지</span>
+            </div>
             <button
-              class="flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors"
-              :class="mode === 'crop' ? 'bg-white font-medium text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-              @click="mode = 'crop'"
+              :disabled="currentPage >= totalPages"
+              class="rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:text-gray-300"
+              @click="nextPage"
             >
-              <!-- 크롭(가위) 아이콘 -->
-              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7.848 8.25l1.536.887M7.848 8.25a3 3 0 11-5.196-3 3 3 0 015.196 3zm1.536.887a2.165 2.165 0 011.083-.313h5.533m-6.616.626L15 15.375m-6.616-6.238l-3.232 5.6a2.165 2.165 0 00.313 2.51l.052.052a2.165 2.165 0 002.51.313l5.6-3.232m0 0L15 15.375m0 0l3.232 5.6a2.165 2.165 0 002.51.313l.052-.052a2.165 2.165 0 00.313-2.51l-3.232-5.6" />
-              </svg>
-              크롭
+              ▶
             </button>
-            <!-- crop 초기화 -->
+
+            <div class="ml-3 flex items-center gap-1 rounded-md border border-gray-300 bg-gray-50 p-0.5">
+              <button
+                class="rounded px-2 py-1 text-xs transition-colors"
+                :class="mode === 'scroll' ? 'bg-white font-medium text-gray-800 shadow-sm' : 'text-gray-500'"
+                @click="mode = 'scroll'"
+              >
+                스크롤
+              </button>
+              <button
+                class="rounded px-2 py-1 text-xs transition-colors"
+                :class="mode === 'crop' ? 'bg-white font-medium text-gray-800 shadow-sm' : 'text-gray-500'"
+                @click="mode = 'crop'"
+              >
+                크롭
+              </button>
+            </div>
+
             <button
-              v-if="hasCropArea"
+              v-if="cropDataMap[currentCropKey]"
               class="rounded px-2 py-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
-              title="선택 영역 초기화"
-              @click="clearCrop"
+              @click="clearCurrentCrop"
             >
               초기화
             </button>
           </div>
         </div>
 
-        <!-- PDF 뷰어 + crop 오버레이 -->
-        <div class="relative min-h-0 flex-1 overflow-hidden">
-          <!-- PDF iframe -->
-          <iframe
-            v-if="pdfUrl"
-            :src="pdfUrl"
-            class="h-full w-full border-0"
-          ></iframe>
-          <div v-else class="flex h-full items-center justify-center text-gray-400">
-            PDF 파일 없음
+        <!-- PDF 이미지 + crop 오버레이 -->
+        <div class="relative min-h-0 flex-1 overflow-auto bg-gray-100">
+          <div v-if="pageLoading" class="flex h-full items-center justify-center">
+            <div class="text-sm text-gray-500">페이지 로딩 중...</div>
           </div>
 
-          <!-- crop 오버레이 — 크롭 모드에서만 표시 -->
+          <div v-else-if="!pageImageUrl" class="flex h-full items-center justify-center text-gray-400">
+            PDF 파일을 선택해주세요.
+          </div>
+
           <div
-            v-if="mode === 'crop'"
-            ref="cropContainer"
-            class="absolute inset-0 cursor-crosshair"
+            v-else
+            ref="imageWrapperRef"
+            class="relative inline-block"
+            :class="mode === 'crop' ? 'cursor-crosshair' : ''"
             @mousedown="handleMouseDown"
             @mousemove="handleMouseMove"
             @mouseup="handleMouseUp"
             @mouseleave="handleMouseUp"
           >
-            <!-- crop 선택 영역 표시 -->
+            <img
+              ref="imgRef"
+              :src="pageImageUrl"
+              class="block max-w-full"
+              draggable="false"
+              @dragstart.prevent
+            />
+
+            <!-- 현재 드래그 중인 crop 영역 -->
             <div
-              v-if="hasCropArea"
-              class="absolute border-2 border-dashed border-blue-500 bg-blue-100/30"
+              v-if="(mode === 'crop' || mode === 'scroll') && hasCropArea"
+              class="pointer-events-none absolute border-2 border-dashed border-blue-500 bg-blue-100/30"
               :style="cropStyle"
             >
               <span class="absolute -top-5 left-0 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">
                 {{ Math.round(cropRect.width) }} x {{ Math.round(cropRect.height) }}
               </span>
             </div>
+
+            <!-- 다른 키의 저장된 crop 영역 (현재 페이지에 해당하는 것만, 반투명 표시) -->
+            <template v-for="(data, key) in cropDataMap" :key="key">
+              <div
+                v-if="key !== currentCropKey && data.page === currentPage"
+                class="pointer-events-none absolute border-2 border-dashed border-gray-400 bg-gray-200/20"
+                :style="{
+                  left: data.left + 'px',
+                  top: data.top + 'px',
+                  width: data.width + 'px',
+                  height: data.height + 'px'
+                }"
+              >
+                <span class="absolute -top-5 left-0 rounded bg-gray-500 px-1.5 py-0.5 text-[10px] text-white">
+                  {{ data.no }}번-{{ data.imageType === 'question' ? '문항' : data.imageType.replace('choice', '') + '번' }}
+                </span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 하단: crop 상태 요약 + 적용/취소 버튼 -->
+        <div class="flex items-center justify-between border-t border-gray-200 px-5 py-3">
+          <!-- crop 상태 요약 (현재 선택 문항 기준) -->
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="btn in activeImageTypeButtons"
+              :key="btn.key"
+              class="rounded px-2 py-0.5 text-xs"
+              :class="cropDataMap[cropKey(selectedNo, btn.key)] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'"
+            >
+              {{ btn.label }}: {{ getCropStatusForKey(selectedNo, btn.key) }}
+            </span>
+            <span class="ml-2 text-xs text-gray-400">
+              (전체 {{ definedCropCount }}개 지정)
+            </span>
           </div>
 
-          <!-- 스크롤 모드일 때 crop 영역만 표시 (투명 오버레이 없이) -->
-          <div
-            v-if="mode === 'scroll' && hasCropArea"
-            class="pointer-events-none absolute inset-0"
-          >
-            <div
-              class="absolute border-2 border-dashed border-blue-500 bg-blue-100/20"
-              :style="cropStyle"
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              @click="emit('close')"
             >
-              <span class="absolute -top-5 left-0 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">
-                {{ Math.round(cropRect.width) }} x {{ Math.round(cropRect.height) }}
-              </span>
-            </div>
+              취소
+            </button>
+            <button
+              :disabled="definedCropCount === 0"
+              class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="handleApply"
+            >
+              적용 ({{ definedCropCount }}개)
+            </button>
           </div>
         </div>
       </div>

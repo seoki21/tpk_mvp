@@ -22,6 +22,7 @@ const store = useExamListStore();
 const columns = [
   { key: 'exam_year_display', label: '년도', width: '100px' },
   { key: 'exam_type_name', label: '시험유형', width: '140px', align: 'left' },
+  { key: 'tpk_type_name', label: '시험종류', width: '120px', align: 'left' },
   { key: 'tpk_level_name', label: '토픽레벨', width: '140px', align: 'left' },
   { key: 'round', label: '회차', width: '80px' },
   { key: 'section_name', label: '영역', width: '140px', align: 'left' },
@@ -219,7 +220,16 @@ onMounted(() => {
           title="PDF 파일 보기"
           @click.stop="handleFileClick(row, $event, 'pdf')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="mx-auto h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />
@@ -237,7 +247,16 @@ onMounted(() => {
           title="JSON 파일 보기"
           @click.stop="handleFileClick(row, $event, 'json')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="mx-auto h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />

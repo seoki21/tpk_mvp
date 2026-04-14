@@ -1,7 +1,7 @@
 """
 시험 파일 서비스 모듈
 tb_exam_file 테이블에 대한 CRUD 비즈니스 로직을 처리한다.
-파일 저장/삭제는 로컬 파일시스템을 사용한다.
+파일 저장/삭제는 Cloudflare R2 Object Storage를 사용한다.
 psycopg (v3) raw SQL을 사용하며 ORM은 사용하지 않는다.
 """
 import os
@@ -10,23 +10,25 @@ from typing import Optional
 from fastapi import UploadFile
 
 from app.database import get_connection
-from app.config import UPLOAD_DIR
+from app.services import r2_storage
 
 
-def _ensure_upload_dir(exam_key: int) -> str:
-    """
-    시험별 업로드 디렉토리를 생성하고 경로를 반환한다.
-    구조: {UPLOAD_DIR}/exam/{exam_key}/
+# MIME 타입 매핑 — 파일 확장자 기반
+_MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".json": "application/json",
+    ".mp3": "audio/mpeg",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".wav": "audio/wav",
+}
 
-    Args:
-        exam_key: 시험 PK
 
-    Returns:
-        업로드 디렉토리 절대 경로
-    """
-    dir_path = os.path.join(UPLOAD_DIR, "exam", str(exam_key))
-    os.makedirs(dir_path, exist_ok=True)
-    return dir_path
+def _get_content_type(filename: str) -> str:
+    """파일명에서 MIME 타입을 추정한다."""
+    ext = os.path.splitext(filename)[1].lower()
+    return _MIME_MAP.get(ext, "application/octet-stream")
 
 
 def list_files(exam_key: int) -> list[dict]:
@@ -63,20 +65,18 @@ async def upload_files(
     exam_key: int, files: list[UploadFile], file_type: str = "pdf", user: str = "admin"
 ) -> list[dict]:
     """
-    파일을 서버에 저장하고 DB에 메타데이터를 등록한다.
+    파일을 R2에 업로드하고 DB에 메타데이터를 등록한다.
     파일명 충돌 방지를 위해 UUID 기반 저장명을 사용한다.
 
     Args:
         exam_key: 시험 PK
         files: 업로드된 파일 리스트
-        file_type: 파일 유형 (pdf, json)
+        file_type: 파일 유형 (pdf, json, mp3)
         user: 등록자
 
     Returns:
         등록된 파일 정보 딕셔너리 리스트
     """
-    upload_dir = _ensure_upload_dir(exam_key)
-
     # 현재 최대 sort_order를 조회하여 이어서 번호 부여
     conn = get_connection()
     try:
@@ -95,16 +95,17 @@ async def upload_files(
         # UUID 기반 저장 파일명 생성 (확장자 유지)
         ext = os.path.splitext(file.filename)[1] or ".pdf"
         stored_name = f"{uuid.uuid4().hex}{ext}"
-        stored_path = os.path.join(upload_dir, stored_name)
 
-        # 파일 저장
+        # R2 오브젝트 키 = DB에 저장될 상대 경로
+        r2_key = f"exam/{exam_key}/{stored_name}"
+
+        # 파일 읽기
         content = await file.read()
         file_size = len(content)
-        with open(stored_path, "wb") as f:
-            f.write(content)
 
-        # DB에 상대 경로로 저장 (UPLOAD_DIR 기준)
-        relative_path = os.path.join("exam", str(exam_key), stored_name).replace("\\", "/")
+        # R2에 업로드
+        content_type = _get_content_type(file.filename)
+        r2_storage.upload_bytes(r2_key, content, content_type)
 
         conn = get_connection()
         try:
@@ -120,7 +121,7 @@ async def upload_files(
                 (
                     exam_key,
                     file.filename,
-                    relative_path,
+                    r2_key,
                     file_size,
                     current_max + idx + 1,
                     file_type,
@@ -132,9 +133,11 @@ async def upload_files(
             conn.commit()
         except Exception:
             conn.rollback()
-            # 저장된 파일 정리
-            if os.path.exists(stored_path):
-                os.remove(stored_path)
+            # R2에 업로드된 파일 정리
+            try:
+                r2_storage.delete_object(r2_key)
+            except Exception:
+                pass
             raise
         finally:
             conn.close()
@@ -144,7 +147,7 @@ async def upload_files(
 
 def delete_file(pdf_key: int, user: str = "admin") -> Optional[dict]:
     """
-    파일을 소프트 삭제하고 실제 파일도 삭제한다.
+    파일을 소프트 삭제하고 R2에서도 삭제한다.
 
     Args:
         pdf_key: 삭제할 파일 PK
@@ -179,10 +182,11 @@ def delete_file(pdf_key: int, user: str = "admin") -> Optional[dict]:
         )
         conn.commit()
 
-        # 실제 파일 삭제
-        full_path = os.path.join(UPLOAD_DIR, file_info["file_path"])
-        if os.path.exists(full_path):
-            os.remove(full_path)
+        # R2에서 실제 파일 삭제
+        try:
+            r2_storage.delete_object(file_info["file_path"])
+        except Exception:
+            pass  # R2 삭제 실패는 무시 (DB 소프트 삭제는 이미 완료)
 
         return file_info
     except Exception:

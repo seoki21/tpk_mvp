@@ -273,8 +273,17 @@ defineExpose({ generateExcel });
           @click="showExcelConfirm = true"
         >
           <!-- 스프레드시트 아이콘 (가로로 살짝 넓은 형태) -->
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-5">
-            <path fill-rule="evenodd" d="M1 3.5A1.5 1.5 0 0 1 2.5 2h15A1.5 1.5 0 0 1 19 3.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 16.5v-13ZM3 5v2h4V5H3Zm6 0v2h4V5H9Zm6 0v2h2V5h-2ZM3 9v2h4V9H3Zm6 0v2h4V9H9Zm6 0v2h2V9h-2ZM3 13v2h4v-2H3Zm6 0v2h4v-2H9Zm6 0v2h2v-2h-2Z" clip-rule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            class="h-4 w-5"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M1 3.5A1.5 1.5 0 0 1 2.5 2h15A1.5 1.5 0 0 1 19 3.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 16.5v-13ZM3 5v2h4V5H3Zm6 0v2h4V5H9Zm6 0v2h2V5h-2ZM3 9v2h4V9H3Zm6 0v2h4V9H9Zm6 0v2h2V9h-2ZM3 13v2h4v-2H3Zm6 0v2h4v-2H9Zm6 0v2h2v-2h-2Z"
+              clip-rule="evenodd"
+            />
           </svg>
           <span class="text-xs font-medium">XLS</span>
         </button>

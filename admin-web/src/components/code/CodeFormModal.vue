@@ -202,7 +202,6 @@ function cancelDelete() {
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         />
       </div>
-
     </div>
   </FormModal>
 

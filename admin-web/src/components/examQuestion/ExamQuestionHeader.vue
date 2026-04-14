@@ -9,17 +9,23 @@ import { getInlineViewUrl } from '@/api/examFile';
 
 const props = defineProps({
   /** store 인스턴스 */
-  store: { type: Object, required: true },
+  store: { type: Object, required: true }
 });
 
 const emit = defineEmits([
   'combined-change',
   'convert-click',
   'generate-images',
+  'manual-generate-images',
+  'import-question-json',
+  'import-feedback-json',
   'save-all',
   'retry-exam-options',
-  'toggle-json-filter',
+  'toggle-json-filter'
 ]);
+
+/* ========== 이미지 생성 드롭다운 ========== */
+const showImageMenu = ref(false);
 
 /* ========== 파일선택 드롭다운 ========== */
 const showFileMenu = ref(false);
@@ -43,21 +49,53 @@ function handleFileMenuClick(type) {
 }
 
 /**
- * 파일 선택 완료 후 처리 (미구현 상태 알림)
- * @param {Event} event - change 이벤트
+ * 문항 JSON 파일 선택 완료 후 처리
+ * 파일을 읽어 JSON 파싱 후 부모에게 데이터를 전달한다.
  */
-function handleFileSelected(event) {
+function handleQuestionFileSelected(event) {
   const file = event.target.files?.[0];
-  if (file) {
-    alert('아직 미구현 상태입니다');
-  }
-  // 같은 파일 재선택 가능하도록 value 초기화
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const items = JSON.parse(e.target.result);
+      if (!Array.isArray(items)) {
+        alert('JSON이 배열 형식이 아닙니다.');
+        return;
+      }
+      emit('import-question-json', items);
+    } catch (err) {
+      alert('JSON 파일 파싱 오류: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
   event.target.value = '';
 }
 
-/** 외부 클릭 시 파일선택 드롭다운 닫기 */
+/**
+ * 피드백 JSON 파일 선택 완료 후 처리
+ * 파일을 읽어 JSON 파싱 후 부모에게 데이터를 전달한다.
+ */
+function handleFeedbackFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      emit('import-feedback-json', data);
+    } catch (err) {
+      alert('JSON 파일 파싱 오류: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+  event.target.value = '';
+}
+
+/** 외부 클릭 시 드롭다운 메뉴 닫기 */
 function handleFileMenuOutsideClick() {
   showFileMenu.value = false;
+  showImageMenu.value = false;
 }
 
 onMounted(() => document.addEventListener('click', handleFileMenuOutsideClick));
@@ -94,11 +132,15 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
 <template>
   <div class="mb-4 flex items-center gap-4 rounded border border-gray-300 bg-gray-50 px-4 py-3">
     <!-- 통합 selectbox + JSON 미변환 필터 체크박스 -->
-    <div class="flex items-center gap-2">
-      <label class="whitespace-nowrap text-sm font-medium text-gray-700">기출문제 파일</label>
+    <div class="flex min-w-0 shrink items-center gap-2">
+      <label class="shrink-0 whitespace-nowrap text-sm font-medium text-gray-700">기출문제 파일</label>
       <select
-        :value="store.selectedExamKey && store.selectedPdfKey ? store.selectedExamKey + '_' + store.selectedPdfKey : ''"
-        class="min-w-[420px] rounded border border-gray-300 px-3 py-1.5 text-sm"
+        :value="
+          store.selectedExamKey && store.selectedPdfKey
+            ? store.selectedExamKey + '_' + store.selectedPdfKey
+            : ''
+        "
+        class="min-w-[200px] flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm"
         :disabled="store.examOptionsLoading"
         @change="handleCombinedChange"
       >
@@ -119,9 +161,31 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
         @click="showPdfViewer = true"
       >
         <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          <text x="12" y="17" text-anchor="middle" fill="currentColor" font-size="6" font-weight="bold" font-family="Arial">PDF</text>
+          <path
+            d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M14 2v6h6"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <text
+            x="12"
+            y="17"
+            text-anchor="middle"
+            fill="currentColor"
+            font-size="6"
+            font-weight="bold"
+            font-family="Arial"
+          >
+            PDF
+          </text>
         </svg>
       </button>
       <label class="flex cursor-pointer items-center gap-1 whitespace-nowrap text-sm text-gray-600">
@@ -147,25 +211,41 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
 
     <!-- API 팝업 버튼 -->
     <button
-      class="btn btn-sm btn-primary gap-1"
+      class="btn btn-sm btn-primary shrink-0 gap-1"
       :disabled="!store.selectedPdfKey"
       @click="emit('convert-click')"
     >
       API 팝업
-      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+      <svg
+        class="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+        />
       </svg>
     </button>
 
     <!-- 파일선택 드롭다운 버튼 -->
-    <div class="relative">
+    <div class="relative shrink-0">
       <button
         class="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-400 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
         :disabled="!store.selectedPdfKey"
         @click.stop="showFileMenu = !showFileMenu"
       >
         JSON 파일 선택
-        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <svg
+          class="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
           <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -188,17 +268,44 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
         </button>
       </div>
     </div>
-    <!-- 이미지 생성 버튼 -->
-    <button
-      class="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-4 py-1.5 text-sm font-medium text-green-600 transition-colors hover:border-green-400 hover:bg-green-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-      :disabled="!store.selectedPdfKey || store.mergedItems.length === 0"
-      @click="emit('generate-images')"
-    >
-      <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
-      </svg>
-      이미지 생성
-    </button>
+    <!-- 이미지 생성 드롭다운 버튼 -->
+    <div class="relative shrink-0">
+      <button
+        class="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-4 py-1.5 text-sm font-medium text-green-600 transition-colors hover:border-green-400 hover:bg-green-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+        :disabled="!store.selectedPdfKey || store.mergedItems.length === 0"
+        @click.stop="showImageMenu = !showImageMenu"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z"
+          />
+        </svg>
+        이미지 생성
+        <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <!-- 이미지 생성 드롭다운 메뉴 -->
+      <div
+        v-if="showImageMenu"
+        class="absolute left-0 z-20 mt-1 w-40 rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+      >
+        <button
+          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50"
+          @click="showImageMenu = false; emit('generate-images')"
+        >
+          자동 생성
+        </button>
+        <button
+          class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50"
+          @click="showImageMenu = false; emit('manual-generate-images')"
+        >
+          수동 생성
+        </button>
+      </div>
+    </div>
 
     <!-- 숨겨진 file input (문항 / 피드백) -->
     <input
@@ -206,19 +313,19 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
       type="file"
       accept=".json"
       class="hidden"
-      @change="handleFileSelected"
+      @change="handleQuestionFileSelected"
     />
     <input
       ref="feedbackFileInput"
       type="file"
       accept=".json"
       class="hidden"
-      @change="handleFileSelected"
+      @change="handleFeedbackFileSelected"
     />
 
     <!-- 전체 저장 버튼 (우측 끝 정렬) -->
     <button
-      class="btn btn-sm btn-secondary ml-auto"
+      class="btn btn-sm btn-secondary ml-auto shrink-0"
       :disabled="!store.selectedExamKey || store.mergedItems.length === 0"
       @click="emit('save-all')"
     >
@@ -230,10 +337,14 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
   <Teleport to="body">
     <div
       v-if="showPdfViewer"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-y-0 right-0 z-50 flex items-center justify-center overflow-auto bg-black/50"
+      style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))"
       @click="showPdfViewer = false"
     >
-      <div class="mx-4 flex h-[85vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-lg" @click.stop>
+      <div
+        class="mx-4 flex h-[85vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-lg"
+        @click.stop
+      >
         <!-- 타이틀 바 -->
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-3">
           <h2 class="text-base font-semibold text-gray-800">{{ selectedFileName }}</h2>
@@ -247,7 +358,9 @@ const selectedFileName = computed(() => props.store.selectedFile?.file_name || '
         <!-- PDF iframe -->
         <div class="min-h-0 flex-1">
           <iframe v-if="pdfViewerUrl" :src="pdfViewerUrl" class="h-full w-full border-0"></iframe>
-          <div v-else class="flex h-full items-center justify-center text-gray-400">PDF 파일 없음</div>
+          <div v-else class="flex h-full items-center justify-center text-gray-400">
+            PDF 파일 없음
+          </div>
         </div>
       </div>
     </div>

@@ -6,13 +6,79 @@
 import { ref, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useExamQuestionStore } from '@/stores/examQuestion';
-import { bulkSave, generateFeedbackSingle, updateQuestionSingle, cropImages, renameCropImages } from '@/api/examQuestion';
+import {
+  bulkSave,
+  generateFeedbackSingle,
+  updateQuestionSingle,
+  cropImages,
+  renameCropImages,
+  cropManualImages
+} from '@/api/examQuestion';
+import { getCodesByGroup } from '@/api/code';
 import { useToast } from '@/composables/useToast';
 
 export function useExamQuestionCommon() {
   const router = useRouter();
   const store = useExamQuestionStore();
   const toast = useToast();
+
+  /* ========== 코드 목록 (section / passage_type / question_type 셀렉트박스용) ========== */
+  /** 영역(section) 코드 목록 — [{ code, code_name, ... }] */
+  const sectionCodes = ref([]);
+  /** 지문유형(passage_type) 코드 목록 */
+  const passageTypeCodes = ref([]);
+  /** 문제유형(question_type) 코드 목록 */
+  const questionTypeCodes = ref([]);
+
+  /**
+   * tb_code 테이블에서 셀렉트박스용 코드 목록을 일괄 로드한다.
+   * View 컴포넌트의 onMounted에서 호출한다.
+   */
+  async function loadCodeOptions() {
+    try {
+      const [sectionRes, passageRes, questionRes] = await Promise.all([
+        getCodesByGroup('section'),
+        getCodesByGroup('passage_type'),
+        getCodesByGroup('question_type')
+      ]);
+      sectionCodes.value = sectionRes.data || [];
+      passageTypeCodes.value = passageRes.data || [];
+      questionTypeCodes.value = questionRes.data || [];
+    } catch (err) {
+      console.error('[loadCodeOptions] 코드 목록 로드 실패:', err);
+    }
+  }
+
+  /**
+   * 코드 값(숫자)으로 코드명(텍스트)을 조회한다.
+   * @param {Array} codeList - 코드 목록 배열
+   * @param {number|string} codeValue - 코드 값
+   * @returns {string} 코드명 (못 찾으면 코드값 그대로 반환)
+   */
+  function getCodeName(codeList, codeValue) {
+    if (codeValue == null) return '';
+    const found = codeList.find((c) => String(c.code) === String(codeValue));
+    return found ? found.code_name : String(codeValue);
+  }
+
+  /**
+   * 셀렉트박스 값 변경 시 parsed 객체 + 좌측 JSON 텍스트를 동기화한다.
+   * @param {Object} item - mergedItems의 항목
+   * @param {string} field - 변경할 필드명 (section, passage_type, question_type)
+   * @param {*} value - 새 값 (코드 값, 숫자)
+   */
+  function handleCodeFieldChange(item, field, value) {
+    const state = getEditState(item);
+    if (!state.parsed) return;
+
+    /* parsed 객체에 값 반영 (숫자로 저장) */
+    const numValue = value !== '' && value != null ? Number(value) : null;
+    state.parsed[field] = numValue;
+
+    /* 좌측 JSON 텍스트도 동기화 */
+    state.text = JSON.stringify(state.parsed, null, 2);
+    state.error = false;
+  }
 
   /* ========== 확인 다이얼로그 ========== */
   const showConfirm = ref(false);
@@ -165,7 +231,8 @@ export function useExamQuestionCommon() {
 
     /* 영역에 따라 읽기/듣기 화면으로 라우트 분기 */
     if (store.selectedExam) {
-      const targetRoute = store.selectedExam.section_name === '듣기' ? 'pastExamListening' : 'pastExamQuestions';
+      const targetRoute =
+        store.selectedExam.section_name === '듣기' ? 'pastExamListening' : 'pastExamQuestions';
       const currentRoute = router.currentRoute.value.name;
       if (currentRoute !== targetRoute) {
         router.push({ name: targetRoute });
@@ -227,8 +294,8 @@ export function useExamQuestionCommon() {
         const parsed = state.parsed || {};
         const questionData = {
           question_no: item.question_no,
-          section: parsed.section || item.section,
-          question_type: parsed.type || item.question_type,
+          section: parsed.section != null ? String(parsed.section) : (item.section || null),
+          question_type: parsed.question_type != null ? String(parsed.question_type) : (item.question_type || null),
           struct_type: item.struct_type,
           question_json: jsonForSave,
           score: parsed.score || item.score,
@@ -277,9 +344,19 @@ export function useExamQuestionCommon() {
 
   /** locale 코드 → 표시 라벨 매핑 (한국어, 3글자 이내) */
   const localeLabels = {
-    ko: '한국어', en: '영어', vi: '베트남', zh: '중국어',
-    'zh-TW': '대만어', th: '태국어', id: '인니어', uz: '우즈벡',
-    ru: '러시아', ja: '일본어', mn: '몽골어', ne: '네팔어', my: '미얀마'
+    ko: '한국어',
+    en: '영어',
+    vi: '베트남',
+    zh: '중국어',
+    'zh-TW': '대만어',
+    th: '태국어',
+    id: '인니어',
+    uz: '우즈벡',
+    ru: '러시아',
+    ja: '일본어',
+    mn: '몽골어',
+    ne: '네팔어',
+    my: '미얀마'
   };
 
   /**
@@ -434,13 +511,119 @@ export function useExamQuestionCommon() {
       itemSaving.value = true;
       try {
         await updateQuestionSingle(
-          store.selectedExamKey, questionNo, questionMinified, feedbackMinified
+          store.selectedExamKey,
+          questionNo,
+          questionMinified,
+          feedbackMinified
         );
         toast.success('저장되었습니다.');
       } catch (error) {
         toast.error(error.detail || '저장에 실패했습니다.');
       } finally {
         itemSaving.value = false;
+      }
+    };
+    showConfirm.value = true;
+  }
+
+  /* ========== JSON 파일 임포트 ========== */
+
+  /**
+   * 문항 JSON 파일 임포트 핸들러
+   * ExamConvertPopup.confirmSave()와 동일한 로직으로 bulkSave API를 호출한다.
+   * @param {Array} items - 파싱된 JSON 배열 ([{ item_type: 'I'|'Q', ... }])
+   */
+  function handleImportQuestionJson(items) {
+    if (!store.selectedExamKey) {
+      toast.warning('기출문제를 먼저 선택하세요.');
+      return;
+    }
+
+    confirmMessage.value = '문항 JSON 파일을 저장하시겠습니까?';
+    confirmCallback.value = async () => {
+      try {
+        const questions = [];
+        const instructions = [];
+        let insCounter = 1;
+
+        for (const item of items) {
+          if (item.item_type === 'I') {
+            instructions.push({ ins_no: insCounter++, ins_json: JSON.stringify(item) });
+          } else if (item.item_type === 'Q') {
+            questions.push({
+              question_no: item.no,
+              section: item.section != null ? String(item.section) : null,
+              question_type: item.question_type != null ? String(item.question_type) : null,
+              struct_type: null,
+              question_json: JSON.stringify(item),
+              score: item.score || null,
+              difficulty: null
+            });
+          }
+        }
+
+        await bulkSave(store.selectedExamKey, { questions, instructions });
+        toast.success('문항 JSON 파일이 저장되었습니다.');
+        await store.fetchQuestionsAndInstructions(store.selectedExamKey);
+      } catch (error) {
+        toast.error(error.detail || '문항 JSON 저장에 실패했습니다.');
+      }
+    };
+    showConfirm.value = true;
+  }
+
+  /**
+   * 피드백 JSON 파일 임포트 핸들러
+   * 파일 형식: { "question_no": { "locale": [...], ... }, ... } 또는 배열
+   * 각 문항의 feedback_json을 업데이트한다.
+   * @param {Object|Array} data - 파싱된 피드백 JSON 데이터
+   */
+  function handleImportFeedbackJson(data) {
+    if (!store.selectedExamKey) {
+      toast.warning('기출문제를 먼저 선택하세요.');
+      return;
+    }
+    if (store.mergedItems.length === 0) {
+      toast.warning('문항 데이터가 없습니다. 문항 JSON을 먼저 저장하세요.');
+      return;
+    }
+
+    confirmMessage.value = '피드백 JSON 파일을 저장하시겠습니까?';
+    confirmCallback.value = async () => {
+      try {
+        /* 피드백 데이터를 문항별로 매핑하여 bulkSave 호출 */
+        const questions = [];
+
+        for (const item of store.mergedItems) {
+          if (item._type !== 'question') continue;
+
+          const qNo = item.question_no;
+          const feedbackData = data[String(qNo)] || data[qNo];
+          if (!feedbackData) continue;
+
+          const state = getEditState(item);
+          questions.push({
+            question_no: qNo,
+            section: item.section,
+            question_type: item.question_type,
+            struct_type: item.struct_type,
+            question_json: state.text ? JSON.stringify(JSON.parse(state.text)) : item.question_json,
+            feedback_json: JSON.stringify(feedbackData),
+            score: item.score,
+            difficulty: item.difficulty
+          });
+        }
+
+        if (questions.length === 0) {
+          toast.warning('매칭되는 피드백 데이터가 없습니다.');
+          return;
+        }
+
+        await bulkSave(store.selectedExamKey, { questions, instructions: [] });
+        toast.success(`피드백 ${questions.length}건이 저장되었습니다.`);
+        await store.fetchQuestionsAndInstructions(store.selectedExamKey);
+      } catch (error) {
+        toast.error(error.detail || '피드백 JSON 저장에 실패했습니다.');
       }
     };
     showConfirm.value = true;
@@ -496,7 +679,12 @@ export function useExamQuestionCommon() {
           parsed,
           hasQuestionImg,
           hasChoicesImg,
-          no: item._type === 'question' ? item.question_no : (parsed.no_list ? parsed.no_list[0] : item.ins_no),
+          no:
+            item._type === 'question'
+              ? item.question_no
+              : parsed.no_list
+                ? parsed.no_list[0]
+                : item.ins_no
         });
       }
     }
@@ -522,8 +710,13 @@ export function useExamQuestionCommon() {
       const renameMap = [];
       let cropIdx = 0;
 
+      /* 변경 데이터를 임시 보관 — rename 완료 전에 reactive 객체를 수정하면
+         Vue가 re-render하여 아직 존재하지 않는 이미지를 요청하는 문제 방지 */
+      const pendingUpdates = [];
+
       for (const imgItem of imageItems) {
         const no = imgItem.no;
+        const updates = {};
 
         if (imgItem.hasChoicesImg) {
           /* 답안 이미지: 4개 박스를 순서대로 매핑 (2x2 그리드) */
@@ -535,36 +728,40 @@ export function useExamQuestionCommon() {
             const crop = cropResults[cropIdx];
             const newFilename = `ans_${examKey}_${no}_${i + 1}.png`;
             renameMap.push({ old_filename: crop.filename, new_filename: newFilename });
-            /* ① ② ③ ④ 기호 접두사 유지 */
             const circleNum = String.fromCodePoint(0x2460 + i);
             newChoices.push(`${circleNum} ${newFilename}`);
             cropIdx++;
           }
 
-          /* JSON 업데이트: choices를 이미지 경로로 교체 */
-          imgItem.parsed.choices = newChoices;
+          updates.choices = newChoices;
         }
 
         if (imgItem.hasQuestionImg) {
-          /* 문항 이미지: 1개 박스 매핑 */
           if (cropIdx < cropResults.length) {
             const crop = cropResults[cropIdx];
             const newFilename = `qst_${examKey}_${no}.png`;
             renameMap.push({ old_filename: crop.filename, new_filename: newFilename });
-            imgItem.parsed.question_img = newFilename;
+            updates.question_img = newFilename;
             cropIdx++;
           }
         }
 
-        /* 편집 상태에 반영 */
+        pendingUpdates.push({ imgItem, updates });
+      }
+
+      /* 3. 파일명 일괄 변경 (백엔드) — rename 완료까지 reactive 객체를 수정하지 않음 */
+      if (renameMap.length > 0) {
+        await renameCropImages(examKey, renameMap);
+      }
+
+      /* rename 완료 후 parsed 객체 + 편집 상태를 일괄 반영
+         (이 시점부터 이미지 파일이 최종 이름으로 존재) */
+      for (const { imgItem, updates } of pendingUpdates) {
+        if (updates.choices) imgItem.parsed.choices = updates.choices;
+        if (updates.question_img) imgItem.parsed.question_img = updates.question_img;
         imgItem.state.text = JSON.stringify(imgItem.parsed, null, 2);
         imgItem.state.parsed = imgItem.parsed;
         imgItem.state.error = false;
-      }
-
-      /* 3. 파일명 일괄 변경 (백엔드) */
-      if (renameMap.length > 0) {
-        await renameCropImages(examKey, renameMap);
       }
 
       toast.success(`이미지 ${renameMap.length}개 생성 완료. 전체 저장을 눌러주세요.`);
@@ -573,6 +770,138 @@ export function useExamQuestionCommon() {
     } finally {
       imageGenerating.value = false;
     }
+  }
+
+  /* ========== 수동 이미지 생성 (ImageCropPopup) ========== */
+
+  /** 수동 이미지 생성 팝업 표시 상태 */
+  const showImageCropPopup = ref(false);
+  /** 수동 이미지 생성 대상 문항 목록 */
+  const cropPopupImageItems = ref([]);
+
+  /**
+   * "수동 생성" 버튼 클릭 핸들러
+   * 이미지가 필요한 문항을 식별하고 수동 생성 팝업을 연다.
+   */
+  function handleManualGenerateImages() {
+    if (!store.selectedExamKey || !store.selectedPdfKey) {
+      toast.warning('기출문제를 먼저 선택하세요.');
+      return;
+    }
+    if (store.mergedItems.length === 0) {
+      toast.warning('문항 데이터가 없습니다. JSON 변환을 먼저 진행하세요.');
+      return;
+    }
+
+    // 이미지 포함 문항 식별
+    const imageItems = [];
+    for (const item of store.mergedItems) {
+      const state = getEditState(item);
+      const parsed = state.parsed;
+      if (!parsed) continue;
+      if (parsed.is_question_image === 'Y' || parsed.is_choices_image === 'Y') {
+        imageItems.push({
+          item,
+          state,
+          parsed,
+          hasQuestionImg: parsed.is_question_image === 'Y',
+          hasChoicesImg: parsed.is_choices_image === 'Y',
+          no: item._type === 'question'
+            ? item.question_no
+            : parsed.no_list ? parsed.no_list[0] : item.ins_no
+        });
+      }
+    }
+
+    if (imageItems.length === 0) {
+      toast.info('이미지가 포함된 문항이 없습니다.');
+      return;
+    }
+
+    cropPopupImageItems.value = imageItems;
+    showImageCropPopup.value = true;
+  }
+
+  /**
+   * 수동 생성 팝업에서 "적용" 시 호출 (다중 문항 지원)
+   * 각 crop 데이터에 문항번호(no)가 포함되어 있으므로 해당 문항의 parsed를 각각 업데이트한다.
+   * @param {{ crops: Array<{ no, imageType, page, x, y, w, h }> }} cropData
+   */
+  async function handleCropApply(cropData) {
+    if (!cropData.crops || cropData.crops.length === 0) return;
+
+    const examKey = store.selectedExamKey;
+    const pdfKey = store.selectedPdfKey;
+
+    // 문항번호 → imgItem 빠른 조회용 맵 생성
+    const itemMap = {};
+    for (const imgItem of cropPopupImageItems.value) {
+      itemMap[imgItem.no] = imgItem;
+    }
+
+    // 백엔드로 전송할 crop 목록 구성 (문항번호별 filename 생성)
+    const backendCrops = cropData.crops.map((c) => {
+      let filename;
+      if (c.imageType === 'question') {
+        filename = `qst_${examKey}_${c.no}.png`;
+      } else {
+        const choiceIdx = parseInt(c.imageType.replace('choice', ''), 10);
+        filename = `ans_${examKey}_${c.no}_${choiceIdx}.png`;
+      }
+      return {
+        page: c.page,
+        x: c.x,
+        y: c.y,
+        w: c.w,
+        h: c.h,
+        filename
+      };
+    });
+
+    imageGenerating.value = true;
+    try {
+      await cropManualImages(examKey, pdfKey, backendCrops);
+
+      // 문항별로 parsed 객체 업데이트
+      const updatedItems = new Set();
+      for (const crop of cropData.crops) {
+        const imgItem = itemMap[crop.no];
+        if (!imgItem) continue;
+
+        if (crop.imageType === 'question' && imgItem.hasQuestionImg) {
+          imgItem.parsed.question_img = `qst_${examKey}_${crop.no}.png`;
+        } else if (crop.imageType.startsWith('choice') && imgItem.hasChoicesImg) {
+          const choiceIdx = parseInt(crop.imageType.replace('choice', ''), 10);
+          const circleNum = String.fromCodePoint(0x2460 + choiceIdx - 1);
+          const filename = `ans_${examKey}_${crop.no}_${choiceIdx}.png`;
+          if (!imgItem.parsed.choices) imgItem.parsed.choices = [];
+          imgItem.parsed.choices[choiceIdx - 1] = `${circleNum} ${filename}`;
+        }
+
+        updatedItems.add(crop.no);
+      }
+
+      // 변경된 문항들의 편집 상태 일괄 반영
+      for (const no of updatedItems) {
+        const imgItem = itemMap[no];
+        if (!imgItem) continue;
+        imgItem.state.text = JSON.stringify(imgItem.parsed, null, 2);
+        imgItem.state.parsed = imgItem.parsed;
+        imgItem.state.error = false;
+      }
+
+      showImageCropPopup.value = false;
+      toast.success(`이미지 ${backendCrops.length}개 수동 생성 완료. 전체 저장을 눌러주세요.`);
+    } catch (error) {
+      toast.error(error.detail || '수동 이미지 생성에 실패했습니다.');
+    } finally {
+      imageGenerating.value = false;
+    }
+  }
+
+  /** 수동 생성 팝업 닫기 */
+  function handleCropPopupClose() {
+    showImageCropPopup.value = false;
   }
 
   /** 기출문제 목록 재조회 */
@@ -620,8 +949,24 @@ export function useExamQuestionCommon() {
     /* 이미지 생성 */
     imageGenerating,
     handleGenerateImages,
+    /* 수동 이미지 생성 */
+    showImageCropPopup,
+    cropPopupImageItems,
+    handleManualGenerateImages,
+    handleCropApply,
+    handleCropPopupClose,
+    /* JSON 파일 임포트 */
+    handleImportQuestionJson,
+    handleImportFeedbackJson,
+    /* 코드 목록 (셀렉트박스) */
+    sectionCodes,
+    passageTypeCodes,
+    questionTypeCodes,
+    loadCodeOptions,
+    getCodeName,
+    handleCodeFieldChange,
     /* 기타 */
     handleToggleJsonFilter,
-    handleRetryExamOptions,
+    handleRetryExamOptions
   };
 }

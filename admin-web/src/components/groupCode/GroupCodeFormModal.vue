@@ -40,7 +40,7 @@ const modalTitle = computed(() => (isEditMode.value ? '그룹 코드 수정' : '
 const form = ref({
   group_code: '',
   group_name: '',
-  group_desc: '',
+  group_desc: ''
 });
 
 /** 모달이 열릴 때 폼 데이터를 초기화 */
@@ -152,7 +152,6 @@ function cancelDelete() {
           class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
         />
       </div>
-
     </div>
   </FormModal>
 

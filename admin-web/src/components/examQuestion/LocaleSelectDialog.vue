@@ -55,21 +55,18 @@ async function fetchLocales() {
 }
 
 /** 전체 locale 코드 목록 (ko 포함) */
-const allLocaleCodes = computed(() =>
-  localeList.value.map((loc) => loc.code_name)
-);
+const allLocaleCodes = computed(() => localeList.value.map((loc) => loc.code_name));
 
 /** 체크 가능한 locale 목록 (ko 피드백 없으면 ko 제외) */
 const checkableLocales = computed(() =>
-  hasKoFeedback.value
-    ? localeList.value
-    : localeList.value.filter((loc) => loc.code_name !== 'ko')
+  hasKoFeedback.value ? localeList.value : localeList.value.filter((loc) => loc.code_name !== 'ko')
 );
 
 /** 전체 선택 상태 — 체크 가능한 locale이 모두 선택됐는지 */
-const isAllSelected = computed(() =>
-  checkableLocales.value.length > 0 &&
-  checkableLocales.value.every((loc) => selectedLocales.value.includes(loc.code_name))
+const isAllSelected = computed(
+  () =>
+    checkableLocales.value.length > 0 &&
+    checkableLocales.value.every((loc) => selectedLocales.value.includes(loc.code_name))
 );
 
 /** 전체 선택 토글 */
@@ -154,7 +151,7 @@ onMounted(fetchLocales);
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+    <div v-if="visible" class="fixed inset-y-0 right-0 z-[60] flex items-center justify-center overflow-auto bg-black/50" style="left: var(--sidebar-w, 224px); min-width: calc(1200px - var(--sidebar-w, 224px))"
       <div class="mx-4 w-full max-w-sm rounded-lg bg-white shadow-lg">
         <!-- 헤더 -->
         <div class="border-b border-gray-200 px-5 py-3">
@@ -167,7 +164,9 @@ onMounted(fetchLocales);
 
           <template v-else>
             <!-- 전체 선택 -->
-            <label class="mb-3 flex cursor-pointer items-center gap-2 border-b border-gray-200 pb-3">
+            <label
+              class="mb-3 flex cursor-pointer items-center gap-2 border-b border-gray-200 pb-3"
+            >
               <input
                 type="checkbox"
                 :checked="isAllSelected"
@@ -193,7 +192,9 @@ onMounted(fetchLocales);
                 />
                 <span class="text-sm text-gray-700">
                   한국어 (ko)
-                  <span v-if="existingLocales.includes('ko')" class="text-xs text-green-600">*</span>
+                  <span v-if="existingLocales.includes('ko')" class="text-xs text-green-600"
+                    >*</span
+                  >
                 </span>
               </label>
 
@@ -211,7 +212,11 @@ onMounted(fetchLocales);
                 />
                 <span class="text-sm text-gray-700">
                   {{ loc.code_desc }} ({{ loc.code_name }})
-                  <span v-if="existingLocales.includes(loc.code_name)" class="text-xs text-green-600">*</span>
+                  <span
+                    v-if="existingLocales.includes(loc.code_name)"
+                    class="text-xs text-green-600"
+                    >*</span
+                  >
                 </span>
               </label>
             </div>
@@ -225,12 +230,8 @@ onMounted(fetchLocales);
 
         <!-- 하단 버튼 -->
         <div class="flex items-center justify-center gap-3 border-t border-gray-200 px-5 py-3">
-          <button class="btn btn-sm btn-primary px-6" @click="handleConfirm">
-            생성
-          </button>
-          <button class="btn btn-sm btn-secondary px-6" @click="emit('cancel')">
-            취소
-          </button>
+          <button class="btn btn-sm btn-primary px-6" @click="handleConfirm">생성</button>
+          <button class="btn btn-sm btn-secondary px-6" @click="emit('cancel')">취소</button>
         </div>
       </div>
     </div>

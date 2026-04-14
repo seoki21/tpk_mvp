@@ -137,11 +137,7 @@ onMounted(() => {
           class="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm"
         >
           <option value=""></option>
-          <option
-            v-for="gc in sortedGroupCodes"
-            :key="gc.group_code"
-            :value="gc.group_code"
-          >
+          <option v-for="gc in sortedGroupCodes" :key="gc.group_code" :value="gc.group_code">
             {{ gc.group_code }} - {{ gc.group_name }}
           </option>
         </select>

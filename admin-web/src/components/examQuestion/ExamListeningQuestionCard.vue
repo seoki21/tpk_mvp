@@ -42,7 +42,15 @@ const props = defineProps({
   mp3File: { type: Object, default: null },
   /** 시험키 PK (MP3 다운로드 URL 생성용) */
   examKey: { type: Number, default: null },
+  /** 영역(section) 코드 목록 — [{ code, code_name }] */
+  sectionCodes: { type: Array, default: () => [] },
+  /** 지문유형(passage_type) 코드 목록 */
+  passageTypeCodes: { type: Array, default: () => [] },
+  /** 문제유형(question_type) 코드 목록 */
+  questionTypeCodes: { type: Array, default: () => [] }
 });
+
+const emit = defineEmits(['code-change']);
 
 /* ========== MP3 재생 URL ========== */
 const mp3Url = computed(() => {
@@ -88,28 +96,41 @@ function parseFeedback(fb) {
 </script>
 
 <template>
-  <!-- 상단: {no}번 {section} {type} {score}점 + 이미지 생성 버튼 -->
+  <!-- 상단: {no}번 + 코드 셀렉트박스 (section, passage_type, question_type) + 배점 -->
   <div class="mb-3 border-b border-gray-200 pb-2">
-    <div class="flex items-center gap-2 text-sm">
-      <span class="font-bold text-gray-800">
-        {{ item.question_no }}번
-      </span>
-      <span
-        v-if="parsed && parsed.section"
-        class="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700"
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <span class="font-bold text-gray-800"> {{ item.question_no }}번 </span>
+      <!-- 영역(section) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.section"
+        class="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 focus:border-blue-400 focus:outline-none"
+        @change="emit('code-change', item, 'section', $event.target.value)"
       >
-        {{ parsed.section }}
-      </span>
-      <span
-        v-if="parsed && parsed.type"
-        class="rounded bg-green-50 px-1.5 py-0.5 text-green-700"
+        <option value="">영역</option>
+        <option v-for="c in sectionCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <!-- 지문유형(passage_type) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.passage_type"
+        class="rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700 focus:border-purple-400 focus:outline-none"
+        @change="emit('code-change', item, 'passage_type', $event.target.value)"
       >
-        {{ parsed.type }}
-      </span>
-      <span
-        v-if="parsed && parsed.score"
-        class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700"
+        <option value="">지문유형</option>
+        <option v-for="c in passageTypeCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <!-- 문제유형(question_type) 셀렉트박스 -->
+      <select
+        v-if="parsed"
+        :value="parsed.question_type"
+        class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-700 focus:border-green-400 focus:outline-none"
+        @change="emit('code-change', item, 'question_type', $event.target.value)"
       >
+        <option value="">문제유형</option>
+        <option v-for="c in questionTypeCodes" :key="c.code" :value="c.code">{{ c.code_name }}</option>
+      </select>
+      <span v-if="parsed && parsed.score" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">
         {{ parsed.score }}점
       </span>
     </div>
@@ -117,16 +138,32 @@ function parseFeedback(fb) {
 
   <!-- MP3 플레이어 영역 — v-show로 DOM 유지하여 audio 요소 재생성 방지 -->
   <div class="mb-3">
-    <div v-show="mp3Url" class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+    <div
+      v-show="mp3Url"
+      class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
+    >
       <audio controls preload="none" class="h-8 w-full" :src="mp3Url || ''">
         브라우저에서 오디오를 지원하지 않습니다.
       </audio>
     </div>
     <!-- MP3 파일 없음 — 비활성 플레이어 -->
-    <div v-show="!mp3Url" class="flex items-center gap-2 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-gray-400">
+    <div
+      v-show="!mp3Url"
+      class="flex items-center gap-2 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-gray-400"
+    >
       <!-- 음소거 아이콘 -->
-      <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-3.15a.75.75 0 011.28.53v13.74a.75.75 0 01-1.28.53L6.75 14.25H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+      <svg
+        class="h-5 w-5 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-3.15a.75.75 0 011.28.53v13.74a.75.75 0 01-1.28.53L6.75 14.25H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
+        />
       </svg>
       <span class="text-sm">음성 파일 없음</span>
     </div>
@@ -135,9 +172,7 @@ function parseFeedback(fb) {
   <!-- 본문 -->
   <template v-if="parsed">
     <!-- 문제 번호 -->
-    <p class="mb-1 text-sm font-medium text-gray-800">
-      {{ item.question_no }}.
-    </p>
+    <p class="mb-1 text-sm font-medium text-gray-800">{{ item.question_no }}.</p>
 
     <!-- 문항 이미지 (question_img) — 문항번호 바로 아래 -->
     <div v-if="parsed.question_img" class="mb-3">
@@ -167,7 +202,9 @@ function parseFeedback(fb) {
         class="flex items-center gap-2 rounded border p-1"
         :class="ci + 1 === Number(correctAnswer) ? 'border-blue-400 bg-blue-50' : 'border-gray-200'"
       >
-        <span class="shrink-0 text-sm font-medium text-gray-500">{{ String.fromCodePoint(0x2460 + ci) }}</span>
+        <span class="shrink-0 text-sm font-medium text-gray-500">{{
+          String.fromCodePoint(0x2460 + ci)
+        }}</span>
         <img
           :src="getImageUrl(getChoiceImageFilename(choice))"
           :alt="`선택지 ${ci + 1}`"
@@ -175,10 +212,7 @@ function parseFeedback(fb) {
         />
       </div>
     </div>
-    <div
-      v-else-if="parsed.choices"
-      class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
-    >
+    <div v-else-if="parsed.choices" class="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
       <span
         v-for="(choice, ci) in parsed.choices"
         :key="ci"
@@ -215,19 +249,13 @@ function parseFeedback(fb) {
           v-for="(fb, fi) in getActiveFeedbackList()"
           :key="fi"
           class="flex items-start gap-1.5 text-sm leading-relaxed"
-          :class="
-            parseFeedback(fb).isCorrect
-              ? 'font-medium text-blue-700'
-              : 'text-gray-600'
-          "
+          :class="parseFeedback(fb).isCorrect ? 'font-medium text-blue-700' : 'text-gray-600'"
         >
           <span class="shrink-0">{{ parseFeedback(fb).label }}</span>
           <span>{{ parseFeedback(fb).text }}</span>
         </div>
       </div>
-      <p v-else class="py-2 text-sm text-gray-400">
-        피드백 데이터가 없습니다.
-      </p>
+      <p v-else class="py-2 text-sm text-gray-400">피드백 데이터가 없습니다.</p>
     </div>
   </template>
   <p v-else class="text-sm text-gray-400">JSON 파싱 불가</p>

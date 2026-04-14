@@ -33,7 +33,9 @@ const emit = defineEmits(['close', 'saved']);
 const isEditMode = computed(() => props.editData !== null);
 
 /** 모달 타이틀 */
-const modalTitle = computed(() => isEditMode.value ? '연습문제 생성 요청 수정' : '연습문제 생성 요청');
+const modalTitle = computed(() =>
+  isEditMode.value ? '연습문제 생성 요청 수정' : '연습문제 생성 요청'
+);
 
 /* ========== 폼 데이터 ========== */
 const form = ref({
